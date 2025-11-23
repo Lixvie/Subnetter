@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP Subnet & Range Drills</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100;400;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            font-family: 'JetBrains Mono', monospace;
+            overflow: hidden;
+        }
+
+        ::selection { background: #ffffff; color: #000000; }
+
+        #input-field {
+            caret-color: #ff0044;
+            background: transparent;
+            border: none;
+            outline: none;
+            text-align: center;
+            width: 100%;
+        }
+        
+        /* Chrome Autofill Fix */
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover, 
+        input:-webkit-autofill:focus, 
+        input:-webkit-autofill:active{
+            -webkit-box-shadow: 0 0 0 30px #000000 inset !important;
+            -webkit-text-fill-color: white !important;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+
+        .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Custom Checkbox Styling */
+        .toggle-checkbox:checked {
+            background-color: #06b6d4; /* cyan-500 */
+            border-color: #06b6d4;
+        }
+        .toggle-checkbox:checked:after {
+            transform: translateX(100%);
+            border-color: white;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-center items-center p-4 relative">
+
+    <!-- Config Button -->
+    <button onclick="toggleSettings()" class="absolute top-6 right-6 text-gray-500 hover:text-cyan-500 transition-colors uppercase tracking-widest text-xs font-bold z-50">
+        [ Config ]
+    </button>
+
+    <!-- Main Container -->
+    <div id="main-ui" class="w-full max-w-4xl flex flex-col items-center justify-center space-y-8 relative z-10">
+        
+        <!-- Question Block -->
+        <div id="question-container" class="w-full text-center fade-in">
+            <h2 class="text-gray-500 text-sm uppercase tracking-[0.3em] mb-4">Current Query</h2>
+            <h1 id="question-text" class="text-3xl md:text-5xl font-light leading-tight text-gray-200">
+                Initializing...
+            </h1>
+        </div>
+
+        <!-- Input Block -->
+        <div class="w-full relative group">
+            <input type="text" 
+                   id="input-field" 
+                   class="text-4xl md:text-7xl font-bold text-white placeholder-gray-800 transition-all duration-300" 
+                   placeholder="..." 
+                   autocomplete="off" 
+                   autofocus>
+        </div>
+
+        <!-- Feedback / Status -->
+        <div class="flex flex-col items-center space-y-2 h-32">
+            <div id="feedback" class="h-8 text-center opacity-0 transition-opacity duration-200">
+                <span id="feedback-text" class="text-red-500 font-bold tracking-widest uppercase text-sm">WRONG</span>
+            </div>
+
+            <!-- Solution Reveal -->
+            <div id="solution" class="text-center opacity-0 transition-opacity duration-300 flex flex-col items-center">
+                <span id="solution-text" class="text-cyan-500 text-sm tracking-[0.2em] font-bold mb-2"></span>
+                <p id="explanation-text" class="text-gray-400 text-xs md:text-sm max-w-lg leading-relaxed"></p>
+            </div>
+        </div>
+
+        <!-- Hint -->
+        <div class="absolute bottom-[-150px] text-gray-700 text-xs md:text-sm font-light text-center">
+            press [enter] to submit // [esc] to skip <br>
+            math allowed // format ranges "min-max"
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/90 backdrop-blur-sm z-40 hidden flex items-center justify-center p-4">
+        <div class="bg-zinc-900 border border-zinc-800 p-8 max-w-lg w-full shadow-2xl relative">
+            <h2 class="text-white text-xl font-light uppercase tracking-[0.2em] mb-6 border-b border-zinc-800 pb-4">Configuration</h2>
+            
+            <div id="settings-list" class="space-y-4 mb-8 max-h-[60vh] overflow-y-auto pr-2">
+                <!-- Checkboxes injected here -->
+            </div>
+
+            <div class="flex justify-end">
+                <button onclick="toggleSettings()" class="bg-white text-black hover:bg-cyan-400 font-bold py-2 px-6 text-sm uppercase tracking-widest transition-colors">
+                    Save & Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Utilities ---
+        const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+        const intToIp = (int) => [(int>>>24)&255, (int>>>16)&255, (int>>>8)&255, int&255].join('.');
+        const ipToInt = (ip) => ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
+
+        // --- Question Registry ---
+        // We store generators in an object to easily map them to settings
+        const questionRegistry = [
+            {
+                id: 'cidr_to_mask',
+                label: 'CIDR to Subnet Mask',
+                enabled: true,
+                fn: () => {
+                    const cidr = rand(8, 30);
+                    let mask = [];
+                    for(let i=0; i<4; i++) mask.push(256 - Math.pow(2, 8 - Math.max(0, Math.min(cidr - 8*i, 8))));
+                    return {
+                        q: `What is the Subnet Mask for /${cidr}?`,
+                        a: mask.join('.'),
+                        e: `/${cidr} means ${cidr} bits are set to 1. The mask is ${mask.join('.')}.`
+                    };
+                }
+            },
+            {
+                id: 'usable_hosts',
+                label: 'Usable Hosts Calculation',
+                enabled: true,
+                fn: () => {
+                    const cidr = rand(16, 30);
+                    const hosts = Math.pow(2, 32 - cidr) - 2;
+                    return {
+                        q: `How many usable hosts in a /${cidr} network?`,
+                        a: hosts.toString(),
+                        e: `Formula: 2^(32 - CIDR) - 2. 2^${32-cidr} - 2 = ${hosts}.`
+                    };
+                }
+            },
+            {
+                id: 'network_id',
+                label: 'Network ID Calculation',
+                enabled: true,
+                fn: () => {
+                    const cidr = rand(24, 30);
+                    const ip = `192.168.${rand(0, 255)}.${rand(0, 255)}`;
+                    const netId = intToIp(ipToInt(ip) & (-1 << (32 - cidr)));
+                    return {
+                        q: `What is the Network ID for ${ip}/${cidr}?`,
+                        a: netId,
+                        e: `Apply mask /${cidr}. Host bits zeroed out. ${ip} -> ${netId}.`
+                    };
+                }
+            },
+            {
+                id: 'broadcast_id',
+                label: 'Broadcast ID Calculation',
+                enabled: true,
+                fn: () => {
+                    const cidr = rand(24, 30);
+                    const ip = `10.${rand(0, 255)}.${rand(0, 255)}.${rand(0, 255)}`;
+                    const mask = -1 << (32 - cidr);
+                    const bCast = intToIp((ipToInt(ip) & mask) | (~mask));
+                    return {
+                        q: `What is the Broadcast ID for ${ip}/${cidr}?`,
+                        a: bCast,
+                        e: `Network ID | (inverted mask). Last address in block.`
+                    };
+                }
+            },
+            {
+                id: 'special_ips',
+                label: 'Special IP Functions (Loopback/Multi)',
+                enabled: true,
+                fn: () => {
+                    const type = rand(1, 3);
+                    if (type === 1) return { q: `Function of 127.${rand(0,255)}.${rand(0,255)}.1?`, a: "loopback", e: "127.0.0.0/8 is Loopback." };
+                    if (type === 2) return { q: `Class of ${rand(224, 239)}.${rand(0,255)}.${rand(0,255)}.5?`, a: "d", e: "Class D (224-239) is Multicast." };
+                    return { q: `Class of ${rand(240, 254)}.${rand(0,255)}.${rand(0,255)}.5?`, a: "e", e: "Class E (240-255) is Experimental." };
+                }
+            },
+            {
+                id: 'class_id',
+                label: 'Identify Class by IP',
+                enabled: true,
+                fn: () => {
+                    const type = rand(1, 3); 
+                    if (type === 1) return { q: `Class of ${rand(1, 126)}.${rand(0,255)}.x.x?`, a: "A", e: "Class A: 1-126" };
+                    if (type === 2) return { q: `Class of ${rand(128, 191)}.${rand(0,255)}.x.x?`, a: "B", e: "Class B: 128-191" };
+                    return { q: `Class of ${rand(192, 223)}.${rand(0,255)}.x.x?`, a: "C", e: "Class C: 192-223" };
+                }
+            },
+            {
+                id: 'class_ranges',
+                label: 'First Octet Ranges (Start/End)',
+                enabled: true,
+                fn: () => {
+                    const classes = [
+                        { name: "Class A", range: "1-126" },
+                        { name: "Class B", range: "128-191" },
+                        { name: "Class C", range: "192-223" },
+                        { name: "Multicast (Class D)", range: "224-239" },
+                        { name: "Experimental (Class E)", range: "240-255" }
+                    ];
+                    const s = classes[rand(0, classes.length - 1)];
+                    return { q: `First octet range for ${s.name}?`, a: s.range, e: `${s.name} starts/ends at ${s.range}.` };
+                }
+            }
+        ];
+
+        // --- State ---
+        let currentQuestion = {};
+        const insults = ["PATHETIC.", "TRY STUDYING.", "NO.", "INCORRECT.", "SAD.", "RTFM.", "LAYER 8 ERROR."];
+        const inputField = document.getElementById('input-field');
+        const feedbackDiv = document.getElementById('feedback');
+        const feedbackText = document.getElementById('feedback-text');
+        const solutionDiv = document.getElementById('solution');
+        
+        // --- Settings Logic ---
+        function loadSettings() {
+            const saved = localStorage.getItem('ipDrillSettings');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                questionRegistry.forEach(item => {
+                    if (parsed.hasOwnProperty(item.id)) {
+                        item.enabled = parsed[item.id];
+                    }
+                });
+            }
+            renderSettingsList();
+        }
+
+        function saveSettings() {
+            const settingsMap = {};
+            questionRegistry.forEach(item => settingsMap[item.id] = item.enabled);
+            localStorage.setItem('ipDrillSettings', JSON.stringify(settingsMap));
+        }
+
+        function renderSettingsList() {
+            const list = document.getElementById('settings-list');
+            list.innerHTML = '';
+            
+            questionRegistry.forEach(item => {
+                const div = document.createElement('div');
+                div.className = "flex items-center justify-between p-2 hover:bg-zinc-800/50 border border-transparent hover:border-zinc-700 transition-colors cursor-pointer";
+                div.onclick = (e) => {
+                    // Toggle checkbox if clicking the row
+                    if (e.target.type !== 'checkbox') {
+                        const cb = div.querySelector('input');
+                        cb.checked = !cb.checked;
+                        updateSetting(item.id, cb.checked);
+                    }
+                };
+
+                div.innerHTML = `
+                    <span class="text-gray-300 text-sm font-mono">${item.label}</span>
+                    <input type="checkbox" 
+                        class="w-5 h-5 accent-cyan-500 cursor-pointer" 
+                        ${item.enabled ? 'checked' : ''} 
+                        onclick="event.stopPropagation(); updateSetting('${item.id}', this.checked)">
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function updateSetting(id, isChecked) {
+            const item = questionRegistry.find(i => i.id === id);
+            if (item) item.enabled = isChecked;
+            saveSettings();
+        }
+
+        function toggleSettings() {
+            const modal = document.getElementById('settings-modal');
+            const isHidden = modal.classList.contains('hidden');
+            
+            if (isHidden) {
+                modal.classList.remove('hidden');
+                document.getElementById('main-ui').classList.add('blur-sm');
+            } else {
+                // Ensure at least one is enabled
+                if (!questionRegistry.some(q => q.enabled)) {
+                    alert("You must enable at least one question type.");
+                    questionRegistry[0].enabled = true;
+                    renderSettingsList();
+                    return;
+                }
+                modal.classList.add('hidden');
+                document.getElementById('main-ui').classList.remove('blur-sm');
+                inputField.focus();
+                nextQuestion(); // Refresh question based on new settings
+            }
+        }
+
+        // --- Game Logic ---
+        function nextQuestion() {
+            // Filter enabled generators
+            const available = questionRegistry.filter(q => q.enabled);
+            if (available.length === 0) return; // Should be caught by toggleSettings
+
+            const gen = available[rand(0, available.length - 1)];
+            currentQuestion = gen.fn();
+            
+            const qContainer = document.getElementById('question-container');
+            qContainer.classList.remove('fade-in');
+            void qContainer.offsetWidth; 
+            qContainer.classList.add('fade-in');
+
+            document.getElementById('question-text').innerText = currentQuestion.q;
+            inputField.value = '';
+            feedbackDiv.style.opacity = '0';
+            solutionDiv.style.opacity = '0';
+            inputField.focus();
+        }
+
+        function checkAnswer() {
+            const userVal = inputField.value.trim().toLowerCase();
+            const cleanUser = userVal.replace(/[\/\s]/g, ''); 
+            const cleanAns = currentQuestion.a.toLowerCase().replace(/[\/\s]/g, '');
+            
+            // Math Eval
+            let calculatedVal = null;
+            try {
+                let sanitized = userVal.replace(/\^/g, '**');
+                if (/^[0-9+\-*/().\s]+$/.test(sanitized) || sanitized.includes('**')) {
+                    calculatedVal = new Function('return ' + sanitized)();
+                }
+            } catch (e) {}
+
+            let isCorrect = (calculatedVal !== null && calculatedVal.toString() === cleanAns) || 
+                            (cleanUser === cleanAns) || 
+                            (userVal === currentQuestion.a.toLowerCase());
+
+            if (isCorrect) {
+                feedbackText.innerText = "ADEQUATE";
+                feedbackText.className = "text-green-500 font-bold tracking-widest uppercase text-sm";
+                feedbackDiv.style.opacity = '1';
+                setTimeout(nextQuestion, 800); 
+            } else {
+                document.body.classList.add('shake');
+                feedbackText.innerText = insults[rand(0, insults.length - 1)];
+                feedbackText.className = "text-[#ff0044] font-bold tracking-widest uppercase text-sm";
+                feedbackDiv.style.opacity = '1';
+                
+                document.getElementById('solution-text').innerText = `ANSWER: ${currentQuestion.a}`;
+                document.getElementById('explanation-text').innerText = currentQuestion.e;
+                solutionDiv.style.opacity = '1';
+                setTimeout(() => document.body.classList.remove('shake'), 500);
+            }
+        }
+
+        // --- Init ---
+        loadSettings();
+        nextQuestion();
+
+        inputField.addEventListener('keydown', (e) => {
+            if (!document.getElementById('settings-modal').classList.contains('hidden')) return;
+            
+            if (e.key === 'Enter') {
+                if(inputField.value === '') return;
+                checkAnswer();
+            }
+            if (e.key === 'Escape') {
+                feedbackText.innerText = "SKIPPED";
+                feedbackText.className = "text-gray-500 font-bold tracking-widest uppercase text-sm";
+                feedbackDiv.style.opacity = '1';
+                setTimeout(nextQuestion, 800);
+            }
+        });
+
+        // Modal Key Handling
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !document.getElementById('settings-modal').classList.contains('hidden')) {
+                toggleSettings();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            // Only focus input if modal is closed and click isn't on button
+            if (document.getElementById('settings-modal').classList.contains('hidden') && 
+                !e.target.closest('button')) {
+                inputField.focus();
+            }
+        });
+
+    </script>
+</body>
+</html>
