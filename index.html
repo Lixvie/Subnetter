@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IP Subnet & Range Drills</title>
+    <title>Subnetter - it helps you subnet</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100;400;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100;400;700;800&display=swap" rel="stylesheet">
     <style>
         body {
             background-color: #000000;
             color: #ffffff;
             font-family: 'JetBrains Mono', monospace;
-            overflow: hidden;
+            overflow-x: hidden;
         }
 
         ::selection { background: #ffffff; color: #000000; }
@@ -27,7 +27,6 @@
             width: 100%;
         }
         
-        /* Chrome Autofill Fix */
         input:-webkit-autofill,
         input:-webkit-autofill:hover, 
         input:-webkit-autofill:focus, 
@@ -51,75 +50,479 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Custom Checkbox Styling */
-        .toggle-checkbox:checked {
-            background-color: #06b6d4; /* cyan-500 */
-            border-color: #06b6d4;
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
-        .toggle-checkbox:checked:after {
-            transform: translateX(100%);
-            border-color: white;
+
+        .glow { 
+            text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor;
         }
+
+        .streak-fire {
+            animation: fire 0.5s ease-in-out;
+        }
+        @keyframes fire {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+        .tab-active {
+            border-bottom: 2px solid #06b6d4;
+            color: #06b6d4;
+        }
+
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+
+        .tooltip {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .has-tooltip:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .modal-content {
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        .badge {
+            transition: all 0.3s ease;
+        }
+        .badge:hover {
+            transform: scale(1.1);
+        }
+        .badge.locked {
+            filter: grayscale(100%) brightness(0.3);
+        }
+
+        .difficulty-easy { border-color: #22c55e; }
+        .difficulty-medium { border-color: #eab308; }
+        .difficulty-hard { border-color: #ef4444; }
+        .difficulty-expert { border-color: #a855f7; }
     </style>
 </head>
-<body class="h-screen w-screen flex flex-col justify-center items-center p-4 relative">
+<body class="min-h-screen w-screen flex flex-col">
 
-    <!-- Config Button -->
-    <button onclick="toggleSettings()" class="absolute top-6 right-6 text-gray-500 hover:text-cyan-500 transition-colors uppercase tracking-widest text-xs font-bold z-50">
-        [ Config ]
-    </button>
-
-    <!-- Main Container -->
-    <div id="main-ui" class="w-full max-w-4xl flex flex-col items-center justify-center space-y-8 relative z-10">
+    <!-- Top Navigation Bar -->
+    <nav class="fixed top-0 left-0 right-0 z-50 bg-black/90 backdrop-blur border-b border-zinc-900">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-6">
+                <h1 class="text-cyan-500 font-bold text-lg tracking-wider">Subnetter</h1>
+                <div class="hidden md:flex items-center space-x-1 text-xs">
+                    <button onclick="setMode('drill')" id="mode-drill" class="px-3 py-2 text-gray-400 hover:text-white transition tab-active">DRILL</button>
+                    <button onclick="setMode('learn')" id="mode-learn" class="px-3 py-2 text-gray-400 hover:text-white transition">LEARN</button>
+                    <button onclick="setMode('challenge')" id="mode-challenge" class="px-3 py-2 text-gray-400 hover:text-white transition">CHALLENGE</button>
+                    <button onclick="setMode('tools')" id="mode-tools" class="px-3 py-2 text-gray-400 hover:text-white transition">TOOLS</button>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                <!-- Stats Display -->
+                <div class="hidden sm:flex items-center space-x-4 text-xs">
+                    <div class="has-tooltip relative">
+                        <span class="text-gray-500">STREAK</span>
+                        <span id="streak-display" class="text-cyan-400 font-bold ml-1">0</span>
+                        <span id="streak-fire-icon" class="hidden">🔥</span>
+                        <div class="tooltip absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-zinc-900 border border-zinc-700 px-2 py-1 text-gray-300 whitespace-nowrap">
+                            Best: <span id="best-streak-tooltip">0</span>
+                        </div>
+                    </div>
+                    <div class="text-gray-700">|</div>
+                    <div>
+                        <span class="text-gray-500">ACC</span>
+                        <span id="accuracy-display" class="text-green-400 font-bold ml-1">0%</span>
+                    </div>
+                    <div class="text-gray-700">|</div>
+                    <div>
+                        <span class="text-gray-500">XP</span>
+                        <span id="xp-display" class="text-yellow-400 font-bold ml-1">0</span>
+                    </div>
+                </div>
+                
+                <button onclick="toggleReference()" class="text-gray-500 hover:text-cyan-500 transition-colors text-xs font-bold">
+                    [REF]
+                </button>
+                <button onclick="toggleStats()" class="text-gray-500 hover:text-cyan-500 transition-colors text-xs font-bold">
+                    [STATS]
+                </button>
+                <button onclick="toggleSettings()" class="text-gray-500 hover:text-cyan-500 transition-colors text-xs font-bold">
+                    [CONFIG]
+                </button>
+            </div>
+        </div>
         
-        <!-- Question Block -->
-        <div id="question-container" class="w-full text-center fade-in">
-            <h2 class="text-gray-500 text-sm uppercase tracking-[0.3em] mb-4">Current Query</h2>
-            <h1 id="question-text" class="text-3xl md:text-5xl font-light leading-tight text-gray-200">
-                Initializing...
-            </h1>
+        <!-- XP Progress Bar -->
+        <div class="h-1 bg-zinc-900">
+            <div id="xp-bar" class="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-all duration-500" style="width: 0%"></div>
         </div>
+    </nav>
 
-        <!-- Input Block -->
-        <div class="w-full relative group">
-            <input type="text" 
-                   id="input-field" 
-                   class="text-4xl md:text-7xl font-bold text-white placeholder-gray-800 transition-all duration-300" 
-                   placeholder="..." 
-                   autocomplete="off" 
-                   autofocus>
-        </div>
-
-        <!-- Feedback / Status -->
-        <div class="flex flex-col items-center space-y-2 h-32">
-            <div id="feedback" class="h-8 text-center opacity-0 transition-opacity duration-200">
-                <span id="feedback-text" class="text-red-500 font-bold tracking-widest uppercase text-sm">WRONG</span>
-            </div>
-
-            <!-- Solution Reveal -->
-            <div id="solution" class="text-center opacity-0 transition-opacity duration-300 flex flex-col items-center">
-                <span id="solution-text" class="text-cyan-500 text-sm tracking-[0.2em] font-bold mb-2"></span>
-                <p id="explanation-text" class="text-gray-400 text-xs md:text-sm max-w-lg leading-relaxed"></p>
-            </div>
-        </div>
-
-        <!-- Hint -->
-        <div class="absolute bottom-[-150px] text-gray-700 text-xs md:text-sm font-light text-center">
-            press [enter] to submit // [esc] to skip <br>
-            math allowed // format ranges "min-max"
-        </div>
+    <!-- Mobile Mode Selector -->
+    <div class="md:hidden fixed top-16 left-0 right-0 z-40 bg-black border-b border-zinc-900 flex">
+        <button onclick="setMode('drill')" class="flex-1 py-2 text-xs text-gray-400 hover:text-white mode-btn" data-mode="drill">DRILL</button>
+        <button onclick="setMode('learn')" class="flex-1 py-2 text-xs text-gray-400 hover:text-white mode-btn" data-mode="learn">LEARN</button>
+        <button onclick="setMode('challenge')" class="flex-1 py-2 text-xs text-gray-400 hover:text-white mode-btn" data-mode="challenge">CHALLENGE</button>
+        <button onclick="setMode('tools')" class="flex-1 py-2 text-xs text-gray-400 hover:text-white mode-btn" data-mode="tools">TOOLS</button>
     </div>
 
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="fixed inset-0 bg-black/90 backdrop-blur-sm z-40 hidden flex items-center justify-center p-4">
-        <div class="bg-zinc-900 border border-zinc-800 p-8 max-w-lg w-full shadow-2xl relative">
-            <h2 class="text-white text-xl font-light uppercase tracking-[0.2em] mb-6 border-b border-zinc-800 pb-4">Configuration</h2>
+    <!-- Main Container -->
+    <main class="flex-1 flex items-center justify-center pt-20 md:pt-16 pb-8 px-4">
+        
+        <!-- DRILL MODE -->
+        <div id="drill-mode" class="w-full max-w-4xl flex flex-col items-center justify-center space-y-6">
             
-            <div id="settings-list" class="space-y-4 mb-8 max-h-[60vh] overflow-y-auto pr-2">
-                <!-- Checkboxes injected here -->
+            <!-- Category & Difficulty Badge -->
+            <div class="flex items-center space-x-3">
+                <span id="category-badge" class="text-xs px-3 py-1 border border-zinc-700 text-gray-400 uppercase tracking-wider">Subnetting</span>
+                <span id="difficulty-badge" class="text-xs px-3 py-1 border text-gray-400 uppercase tracking-wider difficulty-easy">Easy</span>
             </div>
 
-            <div class="flex justify-end">
+            <!-- Timer (for timed mode) -->
+            <div id="timer-display" class="hidden text-4xl font-bold text-gray-600">
+                <span id="timer-value">30</span>
+            </div>
+
+            <!-- Question Block -->
+            <div id="question-container" class="w-full text-center fade-in">
+                <h2 class="text-gray-500 text-sm uppercase tracking-[0.3em] mb-4">Query #<span id="question-number">1</span></h2>
+                <h1 id="question-text" class="text-2xl md:text-4xl lg:text-5xl font-light leading-tight text-gray-200 px-4">
+                    Initializing...
+                </h1>
+                <p id="question-hint" class="text-gray-600 text-sm mt-4 hidden"></p>
+            </div>
+
+            <!-- Input Block -->
+            <div class="w-full relative group">
+                <input type="text" 
+                       id="input-field" 
+                       class="text-3xl md:text-5xl lg:text-7xl font-bold text-white placeholder-gray-800 transition-all duration-300" 
+                       placeholder="..." 
+                       autocomplete="off" 
+                       autofocus>
+            </div>
+
+            <!-- Feedback / Status -->
+            <div class="flex flex-col items-center space-y-2 min-h-[120px]">
+                <div id="feedback" class="h-8 text-center opacity-0 transition-opacity duration-200">
+                    <span id="feedback-text" class="text-red-500 font-bold tracking-widest uppercase text-sm">WRONG</span>
+                    <span id="xp-gained" class="text-yellow-400 text-xs ml-2 hidden">+10 XP</span>
+                </div>
+
+                <!-- Solution Reveal -->
+                <div id="solution" class="text-center opacity-0 transition-opacity duration-300 flex flex-col items-center">
+                    <span id="solution-text" class="text-cyan-500 text-sm tracking-[0.2em] font-bold mb-2"></span>
+                    <p id="explanation-text" class="text-gray-400 text-xs md:text-sm max-w-lg leading-relaxed"></p>
+                    <button id="next-btn" class="hidden mt-4 px-4 py-2 border border-zinc-700 text-gray-400 hover:text-white hover:border-cyan-500 text-xs uppercase tracking-wider transition">
+                        Next Question →
+                    </button>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="flex items-center space-x-4 text-xs text-gray-600">
+                <button onclick="showHint()" class="hover:text-cyan-500 transition">[H] Hint</button>
+                <span>•</span>
+                <button onclick="skipQuestion()" class="hover:text-yellow-500 transition">[ESC] Skip</button>
+                <span>•</span>
+                <button onclick="toggleBookmark()" id="bookmark-btn" class="hover:text-red-500 transition">[B] Bookmark</button>
+            </div>
+
+            <!-- Hint -->
+            <div class="text-gray-700 text-xs font-light text-center mt-4">
+                [ENTER] submit • math expressions allowed • format ranges as "min-max"
+            </div>
+        </div>
+
+        <!-- LEARN MODE -->
+        <div id="learn-mode" class="hidden w-full max-w-4xl">
+            <div class="space-y-6">
+                <h2 class="text-2xl font-light text-center text-gray-200 mb-8">Learning Modules</h2>
+                
+                <div id="learn-modules" class="grid md:grid-cols-2 gap-4">
+                    <!-- Modules injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- CHALLENGE MODE -->
+        <div id="challenge-mode" class="hidden w-full max-w-4xl text-center">
+            <div id="challenge-select" class="space-y-8">
+                <h2 class="text-2xl font-light text-gray-200">Challenge Modes</h2>
+                
+                <div class="grid md:grid-cols-3 gap-4">
+                    <button onclick="startChallenge('speed')" class="p-6 border border-zinc-800 hover:border-cyan-500 transition group">
+                        <div class="text-3xl mb-2">⚡</div>
+                        <h3 class="text-lg font-bold text-white group-hover:text-cyan-400">Speed Run</h3>
+                        <p class="text-gray-500 text-sm mt-2">Answer 20 questions as fast as possible</p>
+                    </button>
+                    
+                    <button onclick="startChallenge('survival')" class="p-6 border border-zinc-800 hover:border-red-500 transition group">
+                        <div class="text-3xl mb-2">💀</div>
+                        <h3 class="text-lg font-bold text-white group-hover:text-red-400">Survival</h3>
+                        <p class="text-gray-500 text-sm mt-2">3 lives. How far can you go?</p>
+                    </button>
+                    
+                    <button onclick="startChallenge('timed')" class="p-6 border border-zinc-800 hover:border-yellow-500 transition group">
+                        <div class="text-3xl mb-2">⏱️</div>
+                        <h3 class="text-lg font-bold text-white group-hover:text-yellow-400">Time Attack</h3>
+                        <p class="text-gray-500 text-sm mt-2">60 seconds. Max questions.</p>
+                    </button>
+                </div>
+
+                <!-- Challenge Leaderboards -->
+                <div class="mt-8 border-t border-zinc-800 pt-8">
+                    <h3 class="text-lg font-bold text-gray-400 mb-4">Your Best Scores</h3>
+                    <div class="grid md:grid-cols-3 gap-4 text-sm">
+                        <div class="p-4 bg-zinc-900/50 border border-zinc-800">
+                            <div class="text-gray-500">Speed Run</div>
+                            <div class="text-2xl font-bold text-cyan-400" id="best-speed">--:--</div>
+                        </div>
+                        <div class="p-4 bg-zinc-900/50 border border-zinc-800">
+                            <div class="text-gray-500">Survival</div>
+                            <div class="text-2xl font-bold text-red-400" id="best-survival">0</div>
+                        </div>
+                        <div class="p-4 bg-zinc-900/50 border border-zinc-800">
+                            <div class="text-gray-500">Time Attack</div>
+                            <div class="text-2xl font-bold text-yellow-400" id="best-timed">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Challenge UI -->
+            <div id="challenge-active" class="hidden space-y-6">
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <span class="text-gray-500 text-sm">CHALLENGE</span>
+                        <h3 id="challenge-type-display" class="text-xl font-bold text-white">Speed Run</h3>
+                    </div>
+                    <div class="text-right">
+                        <div id="challenge-stat-1" class="text-2xl font-bold text-cyan-400">0/20</div>
+                        <div id="challenge-stat-2" class="text-gray-500 text-sm">00:00</div>
+                    </div>
+                </div>
+                
+                <!-- Lives display for survival -->
+                <div id="lives-display" class="hidden flex justify-center space-x-2 mb-4">
+                    <span class="life text-2xl">❤️</span>
+                    <span class="life text-2xl">❤️</span>
+                    <span class="life text-2xl">❤️</span>
+                </div>
+
+                <div id="challenge-question" class="text-2xl md:text-4xl font-light text-gray-200 mb-8"></div>
+                
+                <input type="text" 
+                       id="challenge-input" 
+                       class="text-3xl md:text-5xl font-bold text-white bg-transparent border-none outline-none text-center w-full"
+                       placeholder="..."
+                       autocomplete="off">
+                
+                <button onclick="endChallenge()" class="mt-8 text-gray-600 hover:text-red-500 text-sm transition">
+                    [ESC] Abandon Challenge
+                </button>
+            </div>
+
+            <!-- Challenge Results -->
+            <div id="challenge-results" class="hidden space-y-6">
+                <h2 class="text-3xl font-bold text-white">Challenge Complete!</h2>
+                <div id="challenge-final-stats" class="text-xl text-gray-300"></div>
+                <div id="challenge-new-record" class="text-yellow-400 font-bold hidden">🏆 NEW RECORD!</div>
+                <button onclick="resetChallenge()" class="mt-4 px-6 py-3 bg-cyan-500 text-black font-bold hover:bg-cyan-400 transition">
+                    Try Again
+                </button>
+            </div>
+        </div>
+
+        <!-- TOOLS MODE -->
+        <div id="tools-mode" class="hidden w-full max-w-5xl">
+            <div class="space-y-6">
+                <h2 class="text-2xl font-light text-center text-gray-200 mb-8">Network Tools</h2>
+                
+                <div class="grid lg:grid-cols-2 gap-6">
+                    <!-- Subnet Calculator -->
+                    <div class="border border-zinc-800 p-6">
+                        <h3 class="text-lg font-bold text-cyan-400 mb-4">Subnet Calculator</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-gray-500 text-xs uppercase">IP Address</label>
+                                <input type="text" id="calc-ip" value="192.168.1.100" 
+                                       class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-white focus:border-cyan-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="text-gray-500 text-xs uppercase">CIDR / Subnet Mask</label>
+                                <input type="text" id="calc-cidr" value="/24" 
+                                       class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-white focus:border-cyan-500 outline-none">
+                            </div>
+                            <button onclick="calculateSubnet()" class="w-full bg-cyan-500 text-black font-bold py-2 hover:bg-cyan-400 transition">
+                                Calculate
+                            </button>
+                            <div id="calc-results" class="space-y-2 text-sm hidden">
+                                <div class="flex justify-between"><span class="text-gray-500">Network ID:</span><span id="calc-network" class="text-white font-mono"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">Broadcast:</span><span id="calc-broadcast" class="text-white font-mono"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">First Host:</span><span id="calc-first" class="text-white font-mono"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">Last Host:</span><span id="calc-last" class="text-white font-mono"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">Subnet Mask:</span><span id="calc-mask" class="text-white font-mono"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">Wildcard:</span><span id="calc-wildcard" class="text-white font-mono"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">Usable Hosts:</span><span id="calc-hosts" class="text-white font-mono"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">IP Class:</span><span id="calc-class" class="text-white font-mono"></span></div>
+                                <div class="flex justify-between"><span class="text-gray-500">Type:</span><span id="calc-type" class="text-white font-mono"></span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Binary Converter -->
+                    <div class="border border-zinc-800 p-6">
+                        <h3 class="text-lg font-bold text-cyan-400 mb-4">Binary ↔ Decimal Converter</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-gray-500 text-xs uppercase">Decimal (0-255)</label>
+                                <input type="number" id="conv-decimal" min="0" max="255" value="192" 
+                                       oninput="convertDecToBin()"
+                                       class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-white focus:border-cyan-500 outline-none">
+                            </div>
+                            <div class="text-center text-gray-500">↕</div>
+                            <div>
+                                <label class="text-gray-500 text-xs uppercase">Binary (8-bit)</label>
+                                <input type="text" id="conv-binary" value="11000000" 
+                                       oninput="convertBinToDec()"
+                                       class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-white font-mono focus:border-cyan-500 outline-none">
+                            </div>
+                            
+                            <!-- Bit visualization -->
+                            <div class="mt-4">
+                                <div class="text-gray-500 text-xs uppercase mb-2">Bit Values</div>
+                                <div class="grid grid-cols-8 gap-1 text-center text-xs">
+                                    <div class="text-gray-500">128</div>
+                                    <div class="text-gray-500">64</div>
+                                    <div class="text-gray-500">32</div>
+                                    <div class="text-gray-500">16</div>
+                                    <div class="text-gray-500">8</div>
+                                    <div class="text-gray-500">4</div>
+                                    <div class="text-gray-500">2</div>
+                                    <div class="text-gray-500">1</div>
+                                </div>
+                                <div id="bit-display" class="grid grid-cols-8 gap-1 text-center mt-1">
+                                    <!-- Bits injected here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- IP to Binary -->
+                    <div class="border border-zinc-800 p-6">
+                        <h3 class="text-lg font-bold text-cyan-400 mb-4">IP Address Binary View</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-gray-500 text-xs uppercase">IP Address</label>
+                                <input type="text" id="ip-bin-input" value="192.168.1.1" 
+                                       oninput="showIpBinary()"
+                                       class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-white focus:border-cyan-500 outline-none">
+                            </div>
+                            <div id="ip-binary-output" class="font-mono text-sm space-y-1">
+                                <!-- Binary octets shown here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- VLSM Calculator -->
+                    <div class="border border-zinc-800 p-6">
+                        <h3 class="text-lg font-bold text-cyan-400 mb-4">VLSM Planner</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="text-gray-500 text-xs uppercase">Network Block</label>
+                                <input type="text" id="vlsm-network" value="192.168.1.0/24" 
+                                       class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-white focus:border-cyan-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="text-gray-500 text-xs uppercase">Host Requirements (comma separated)</label>
+                                <input type="text" id="vlsm-hosts" value="50, 25, 10, 5" 
+                                       class="w-full bg-zinc-900 border border-zinc-700 px-3 py-2 text-white focus:border-cyan-500 outline-none">
+                            </div>
+                            <button onclick="calculateVLSM()" class="w-full bg-cyan-500 text-black font-bold py-2 hover:bg-cyan-400 transition">
+                                Calculate VLSM
+                            </button>
+                            <div id="vlsm-results" class="space-y-2 text-sm hidden">
+                                <!-- VLSM results here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/95 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-zinc-900 border border-zinc-800 w-full max-w-2xl shadow-2xl relative modal-content">
+            <div class="sticky top-0 bg-zinc-900 border-b border-zinc-800 p-6 flex justify-between items-center">
+                <h2 class="text-white text-xl font-light uppercase tracking-[0.2em]">Configuration</h2>
+                <button onclick="toggleSettings()" class="text-gray-500 hover:text-white text-2xl">&times;</button>
+            </div>
+            
+            <div class="p-6 space-y-6">
+                <!-- Difficulty -->
+                <div>
+                    <h3 class="text-gray-400 text-sm uppercase tracking-wider mb-3">Difficulty Level</h3>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button onclick="setDifficulty('easy')" class="diff-btn px-3 py-2 border border-green-500 text-green-500 text-sm hover:bg-green-500 hover:text-black transition" data-diff="easy">Easy</button>
+                        <button onclick="setDifficulty('medium')" class="diff-btn px-3 py-2 border border-yellow-500 text-yellow-500 text-sm hover:bg-yellow-500 hover:text-black transition" data-diff="medium">Medium</button>
+                        <button onclick="setDifficulty('hard')" class="diff-btn px-3 py-2 border border-red-500 text-red-500 text-sm hover:bg-red-500 hover:text-black transition" data-diff="hard">Hard</button>
+                        <button onclick="setDifficulty('expert')" class="diff-btn px-3 py-2 border border-purple-500 text-purple-500 text-sm hover:bg-purple-500 hover:text-black transition" data-diff="expert">Expert</button>
+                    </div>
+                </div>
+
+                <!-- Question Categories -->
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-gray-400 text-sm uppercase tracking-wider">Question Categories</h3>
+                        <div class="space-x-2">
+                            <button onclick="selectAllCategories(true)" class="text-xs text-cyan-500 hover:text-cyan-400">All</button>
+                            <button onclick="selectAllCategories(false)" class="text-xs text-gray-500 hover:text-gray-400">None</button>
+                        </div>
+                    </div>
+                    <div id="settings-list" class="space-y-1 max-h-64 overflow-y-auto pr-2">
+                        <!-- Checkboxes injected here -->
+                    </div>
+                </div>
+
+                <!-- Options -->
+                <div>
+                    <h3 class="text-gray-400 text-sm uppercase tracking-wider mb-3">Options</h3>
+                    <div class="space-y-2">
+                        <label class="flex items-center justify-between p-2 hover:bg-zinc-800/50 cursor-pointer">
+                            <span class="text-gray-300 text-sm">Show hints on wrong answer</span>
+                            <input type="checkbox" id="opt-hints" checked class="w-5 h-5 accent-cyan-500">
+                        </label>
+                        <label class="flex items-center justify-between p-2 hover:bg-zinc-800/50 cursor-pointer">
+                            <span class="text-gray-300 text-sm">Sound effects</span>
+                            <input type="checkbox" id="opt-sound" class="w-5 h-5 accent-cyan-500">
+                        </label>
+                        <label class="flex items-center justify-between p-2 hover:bg-zinc-800/50 cursor-pointer">
+                            <span class="text-gray-300 text-sm">Auto-advance on correct</span>
+                            <input type="checkbox" id="opt-auto" checked class="w-5 h-5 accent-cyan-500">
+                        </label>
+                        <label class="flex items-center justify-between p-2 hover:bg-zinc-800/50 cursor-pointer">
+                            <span class="text-gray-300 text-sm">Keyboard shortcuts</span>
+                            <input type="checkbox" id="opt-keys" checked class="w-5 h-5 accent-cyan-500">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sticky bottom-0 bg-zinc-900 border-t border-zinc-800 p-6 flex justify-between">
+                <button onclick="resetProgress()" class="text-red-500 hover:text-red-400 text-sm">Reset All Progress</button>
                 <button onclick="toggleSettings()" class="bg-white text-black hover:bg-cyan-400 font-bold py-2 px-6 text-sm uppercase tracking-widest transition-colors">
                     Save & Close
                 </button>
@@ -127,290 +530,2411 @@
         </div>
     </div>
 
+    <!-- Stats Modal -->
+    <div id="stats-modal" class="fixed inset-0 bg-black/95 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-zinc-900 border border-zinc-800 w-full max-w-3xl shadow-2xl relative modal-content">
+            <div class="sticky top-0 bg-zinc-900 border-b border-zinc-800 p-6 flex justify-between items-center">
+                <h2 class="text-white text-xl font-light uppercase tracking-[0.2em]">Statistics</h2>
+                <button onclick="toggleStats()" class="text-gray-500 hover:text-white text-2xl">&times;</button>
+            </div>
+            
+            <div class="p-6 space-y-6">
+                <!-- Overview Stats -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="text-center p-4 bg-zinc-800/50 border border-zinc-700">
+                        <div class="text-3xl font-bold text-white" id="stat-total">0</div>
+                        <div class="text-gray-500 text-xs uppercase">Total Answered</div>
+                    </div>
+                    <div class="text-center p-4 bg-zinc-800/50 border border-zinc-700">
+                        <div class="text-3xl font-bold text-green-400" id="stat-correct">0</div>
+                        <div class="text-gray-500 text-xs uppercase">Correct</div>
+                    </div>
+                    <div class="text-center p-4 bg-zinc-800/50 border border-zinc-700">
+                        <div class="text-3xl font-bold text-cyan-400" id="stat-streak">0</div>
+                        <div class="text-gray-500 text-xs uppercase">Best Streak</div>
+                    </div>
+                    <div class="text-center p-4 bg-zinc-800/50 border border-zinc-700">
+                        <div class="text-3xl font-bold text-yellow-400" id="stat-xp">0</div>
+                        <div class="text-gray-500 text-xs uppercase">Total XP</div>
+                    </div>
+                </div>
+
+                <!-- Level Progress -->
+                <div class="bg-zinc-800/50 border border-zinc-700 p-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-gray-400">Level <span id="stat-level" class="text-white font-bold">1</span></span>
+                        <span class="text-gray-500 text-sm"><span id="stat-xp-current">0</span> / <span id="stat-xp-needed">100</span> XP</span>
+                    </div>
+                    <div class="h-2 bg-zinc-700 rounded-full overflow-hidden">
+                        <div id="stat-level-bar" class="h-full bg-gradient-to-r from-yellow-600 to-yellow-400 transition-all" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Category Performance -->
+                <div>
+                    <h3 class="text-gray-400 text-sm uppercase tracking-wider mb-3">Category Performance</h3>
+                    <div id="category-stats" class="space-y-2 max-h-48 overflow-y-auto">
+                        <!-- Category stats injected here -->
+                    </div>
+                </div>
+
+                <!-- Achievements -->
+                <div>
+                    <h3 class="text-gray-400 text-sm uppercase tracking-wider mb-3">Achievements</h3>
+                    <div id="achievements-grid" class="grid grid-cols-4 md:grid-cols-6 gap-3">
+                        <!-- Achievements injected here -->
+                    </div>
+                </div>
+
+                <!-- Recent History -->
+                <div>
+                    <h3 class="text-gray-400 text-sm uppercase tracking-wider mb-3">Recent Questions</h3>
+                    <div id="history-list" class="space-y-1 max-h-48 overflow-y-auto text-sm">
+                        <!-- History injected here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="sticky bottom-0 bg-zinc-900 border-t border-zinc-800 p-6 flex justify-end space-x-4">
+                <button onclick="exportStats()" class="text-cyan-500 hover:text-cyan-400 text-sm">Export Data</button>
+                <button onclick="toggleStats()" class="bg-white text-black hover:bg-cyan-400 font-bold py-2 px-6 text-sm uppercase tracking-widest transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reference Modal -->
+    <div id="reference-modal" class="fixed inset-0 bg-black/95 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-zinc-900 border border-zinc-800 w-full max-w-4xl shadow-2xl relative modal-content">
+            <div class="sticky top-0 bg-zinc-900 border-b border-zinc-800 p-6 flex justify-between items-center">
+                <h2 class="text-white text-xl font-light uppercase tracking-[0.2em]">Reference Sheet</h2>
+                <button onclick="toggleReference()" class="text-gray-500 hover:text-white text-2xl">&times;</button>
+            </div>
+            
+            <div class="p-6 space-y-6">
+                <!-- Tabs -->
+                <div class="flex space-x-4 border-b border-zinc-800">
+                    <button onclick="showRefTab('subnets')" class="ref-tab pb-2 text-sm text-cyan-400 border-b-2 border-cyan-400" data-tab="subnets">Subnet Table</button>
+                    <button onclick="showRefTab('classes')" class="ref-tab pb-2 text-sm text-gray-500 hover:text-white" data-tab="classes">IP Classes</button>
+                    <button onclick="showRefTab('private')" class="ref-tab pb-2 text-sm text-gray-500 hover:text-white" data-tab="private">Private Ranges</button>
+                    <button onclick="showRefTab('ports')" class="ref-tab pb-2 text-sm text-gray-500 hover:text-white" data-tab="ports">Common Ports</button>
+                    <button onclick="showRefTab('formulas')" class="ref-tab pb-2 text-sm text-gray-500 hover:text-white" data-tab="formulas">Formulas</button>
+                </div>
+
+                <!-- Subnet Table -->
+                <div id="ref-subnets" class="ref-content">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="text-left text-gray-500 border-b border-zinc-800">
+                                    <th class="py-2 px-2">CIDR</th>
+                                    <th class="py-2 px-2">Subnet Mask</th>
+                                    <th class="py-2 px-2">Wildcard</th>
+                                    <th class="py-2 px-2">Hosts</th>
+                                    <th class="py-2 px-2">Usable</th>
+                                </tr>
+                            </thead>
+                            <tbody id="subnet-table-body" class="font-mono">
+                                <!-- Rows injected -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- IP Classes -->
+                <div id="ref-classes" class="ref-content hidden">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-left text-gray-500 border-b border-zinc-800">
+                                <th class="py-2 px-2">Class</th>
+                                <th class="py-2 px-2">Range</th>
+                                <th class="py-2 px-2">Default Mask</th>
+                                <th class="py-2 px-2">Networks</th>
+                                <th class="py-2 px-2">Hosts/Net</th>
+                            </tr>
+                        </thead>
+                        <tbody class="font-mono">
+                            <tr class="border-b border-zinc-800/50"><td class="py-2 px-2 text-cyan-400">A</td><td class="py-2 px-2">1.0.0.0 - 126.255.255.255</td><td class="py-2 px-2">255.0.0.0</td><td class="py-2 px-2">126</td><td class="py-2 px-2">16,777,214</td></tr>
+                            <tr class="border-b border-zinc-800/50"><td class="py-2 px-2 text-green-400">B</td><td class="py-2 px-2">128.0.0.0 - 191.255.255.255</td><td class="py-2 px-2">255.255.0.0</td><td class="py-2 px-2">16,384</td><td class="py-2 px-2">65,534</td></tr>
+                            <tr class="border-b border-zinc-800/50"><td class="py-2 px-2 text-yellow-400">C</td><td class="py-2 px-2">192.0.0.0 - 223.255.255.255</td><td class="py-2 px-2">255.255.255.0</td><td class="py-2 px-2">2,097,152</td><td class="py-2 px-2">254</td></tr>
+                            <tr class="border-b border-zinc-800/50"><td class="py-2 px-2 text-purple-400">D</td><td class="py-2 px-2">224.0.0.0 - 239.255.255.255</td><td class="py-2 px-2">N/A</td><td class="py-2 px-2" colspan="2">Multicast</td></tr>
+                            <tr><td class="py-2 px-2 text-red-400">E</td><td class="py-2 px-2">240.0.0.0 - 255.255.255.255</td><td class="py-2 px-2">N/A</td><td class="py-2 px-2" colspan="2">Experimental</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Private Ranges -->
+                <div id="ref-private" class="ref-content hidden">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-left text-gray-500 border-b border-zinc-800">
+                                <th class="py-2 px-2">Class</th>
+                                <th class="py-2 px-2">Range</th>
+                                <th class="py-2 px-2">CIDR</th>
+                                <th class="py-2 px-2">Addresses</th>
+                            </tr>
+                        </thead>
+                        <tbody class="font-mono">
+                            <tr class="border-b border-zinc-800/50"><td class="py-2 px-2 text-cyan-400">A</td><td class="py-2 px-2">10.0.0.0 - 10.255.255.255</td><td class="py-2 px-2">10.0.0.0/8</td><td class="py-2 px-2">16,777,216</td></tr>
+                            <tr class="border-b border-zinc-800/50"><td class="py-2 px-2 text-green-400">B</td><td class="py-2 px-2">172.16.0.0 - 172.31.255.255</td><td class="py-2 px-2">172.16.0.0/12</td><td class="py-2 px-2">1,048,576</td></tr>
+                            <tr class="border-b border-zinc-800/50"><td class="py-2 px-2 text-yellow-400">C</td><td class="py-2 px-2">192.168.0.0 - 192.168.255.255</td><td class="py-2 px-2">192.168.0.0/16</td><td class="py-2 px-2">65,536</td></tr>
+                            <tr class="border-b border-zinc-800/50"><td class="py-2 px-2 text-gray-400">Loopback</td><td class="py-2 px-2">127.0.0.0 - 127.255.255.255</td><td class="py-2 px-2">127.0.0.0/8</td><td class="py-2 px-2">16,777,216</td></tr>
+                            <tr><td class="py-2 px-2 text-gray-400">Link-Local</td><td class="py-2 px-2">169.254.0.0 - 169.254.255.255</td><td class="py-2 px-2">169.254.0.0/16</td><td class="py-2 px-2">65,536</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Common Ports -->
+                <div id="ref-ports" class="ref-content hidden">
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <h4 class="text-gray-400 text-xs uppercase mb-2">TCP Ports</h4>
+                            <table class="w-full text-sm">
+                                <tbody class="font-mono">
+                                    <tr class="border-b border-zinc-800/50"><td class="py-1 text-cyan-400">20-21</td><td class="py-1 text-gray-300">FTP</td></tr>
+                                    <tr class="border-b border-zinc-800/50"><td class="py-1 text-cyan-400">22</td><td class="py-1 text-gray-300">SSH</td></tr>
+                                    <tr class="border-b border-zinc-800/50"><td class="py-1 text-cyan-400">23</td><td class="py-1 text-gray-300">Telnet</td></tr>
+                                    <tr class="border-b border-zinc-800/50"><td class="py-1 text-cyan-400">25</td><td class="py-1 text-gray-300">SMTP</td></tr>
+                                    <tr class="border-b border-zinc-800/50"><td class="py-1 text-cyan-400">53</td><td class="py-1 text-gray-300">DNS</td></tr>
+                                    <tr class="border-b border-zinc-800/50"><td class="py-1 text-cyan-400">80</td><td class="py-1 text-gray-300">HTTP</td></tr>
+                                    <tr class="border-b border-zinc-800/50"><td class="py-1 text-cyan-400">110</td><td class="py-1 text-gray-300">POP3</td></tr>
+                                    <tr class="border-b border-zinc-800/50"><td class="py-1 text-cyan-400">143</td><td class="py-1 text-gray-300">IMAP</td></tr>
+                                    <tr class="border-b border-zinc-800/50"><td class="py-1 text-cyan-400">443</td><td class="py-1 text-gray-300">HTTPS</td></tr>
+                                    <tr class="border-b border-zinc-800/50"><td class="py-1 text-cyan-400">3389</td><td class="py-1 text-gray-300">RDP</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div>
+                            <h4 class="text-gray-400 text-xs uppercase mb-2">UDP Ports</h4>
+                            <table class="w-full text-sm">
+                                <tbody class="font-mono">
+                                    <tr class="border-b border-zinc-800/50"><td class="py-1 text-green-400">53</td><td class="py-1 text-gray-300">DNS</td></tr>
+                                    <tr class="border-b border-zinc-800/50"><td class="py-1 text-green-400">67-68</td><td class="py-1 text-gray-300">DHCP</td></tr>
+                                    <tr class="border-b border-zinc-800/50"><td class="py-1 text-green-400">69</td><td class="py-1 text-gray-300">TFTP</td></tr>
+                                    <tr class="border-b border-zinc-800/50"><td class="py-1 text-green-400">123</td><td class="py-1 text-gray-300">NTP</td></tr>
+                                    <tr class="border-b border-zinc-800/50"><td class="py-1 text-green-400">161-162</td><td class="py-1 text-gray-300">SNMP</td></tr>
+                                    <tr class="border-b border-zinc-800/50"><td class="py-1 text-green-400">514</td><td class="py-1 text-gray-300">Syslog</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Formulas -->
+                <div id="ref-formulas" class="ref-content hidden space-y-4">
+                    <div class="p-4 bg-zinc-800/50 border border-zinc-700">
+                        <h4 class="text-cyan-400 font-bold mb-2">Usable Hosts</h4>
+                        <code class="text-white">2^(32 - CIDR) - 2</code>
+                        <p class="text-gray-500 text-sm mt-1">Subtract 2 for network ID and broadcast address</p>
+                    </div>
+                    <div class="p-4 bg-zinc-800/50 border border-zinc-700">
+                        <h4 class="text-cyan-400 font-bold mb-2">Number of Subnets</h4>
+                        <code class="text-white">2^(borrowed bits)</code>
+                        <p class="text-gray-500 text-sm mt-1">Borrowed bits = new CIDR - original CIDR</p>
+                    </div>
+                    <div class="p-4 bg-zinc-800/50 border border-zinc-700">
+                        <h4 class="text-cyan-400 font-bold mb-2">Block Size (Magic Number)</h4>
+                        <code class="text-white">256 - subnet mask octet</code>
+                        <p class="text-gray-500 text-sm mt-1">Increment for network addresses in interesting octet</p>
+                    </div>
+                    <div class="p-4 bg-zinc-800/50 border border-zinc-700">
+                        <h4 class="text-cyan-400 font-bold mb-2">Network ID</h4>
+                        <code class="text-white">IP AND Subnet Mask</code>
+                        <p class="text-gray-500 text-sm mt-1">Bitwise AND operation</p>
+                    </div>
+                    <div class="p-4 bg-zinc-800/50 border border-zinc-700">
+                        <h4 class="text-cyan-400 font-bold mb-2">Broadcast Address</h4>
+                        <code class="text-white">Network ID OR Wildcard Mask</code>
+                        <p class="text-gray-500 text-sm mt-1">Bitwise OR with inverted mask</p>
+                    </div>
+                    <div class="p-4 bg-zinc-800/50 border border-zinc-700">
+                        <h4 class="text-cyan-400 font-bold mb-2">CIDR from Hosts Needed</h4>
+                        <code class="text-white">32 - ceil(log2(hosts + 2))</code>
+                        <p class="text-gray-500 text-sm mt-1">Add 2 for network and broadcast</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Learn Module Modal -->
+    <div id="learn-modal" class="fixed inset-0 bg-black/95 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-zinc-900 border border-zinc-800 w-full max-w-3xl shadow-2xl relative modal-content">
+            <div class="sticky top-0 bg-zinc-900 border-b border-zinc-800 p-6 flex justify-between items-center">
+                <h2 id="learn-modal-title" class="text-white text-xl font-light uppercase tracking-[0.2em]">Module</h2>
+                <button onclick="closeLearnModal()" class="text-gray-500 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div id="learn-modal-content" class="p-6">
+                <!-- Content injected -->
+            </div>
+            <div class="sticky bottom-0 bg-zinc-900 border-t border-zinc-800 p-6 flex justify-between">
+                <button onclick="prevLearnPage()" id="learn-prev" class="text-gray-500 hover:text-white text-sm disabled:opacity-30">← Previous</button>
+                <span id="learn-page-indicator" class="text-gray-500 text-sm">1 / 5</span>
+                <button onclick="nextLearnPage()" id="learn-next" class="text-cyan-500 hover:text-cyan-400 text-sm">Next →</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Achievement Popup -->
+    <div id="achievement-popup" class="fixed bottom-8 right-8 bg-zinc-900 border border-yellow-500 p-4 shadow-2xl z-50 hidden transform translate-x-full transition-transform duration-500">
+        <div class="flex items-center space-x-4">
+            <div id="achievement-icon" class="text-4xl">🏆</div>
+            <div>
+                <div class="text-yellow-400 text-xs uppercase tracking-wider">Achievement Unlocked!</div>
+                <div id="achievement-name" class="text-white font-bold"></div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // --- Utilities ---
+        // ============================================
+        // UTILITIES
+        // ============================================
         const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
         const intToIp = (int) => [(int>>>24)&255, (int>>>16)&255, (int>>>8)&255, int&255].join('.');
         const ipToInt = (ip) => ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
+        const decToBin = (dec, pad = 8) => dec.toString(2).padStart(pad, '0');
+        const binToDec = (bin) => parseInt(bin, 2);
 
-        // --- Question Registry ---
-        // We store generators in an object to easily map them to settings
+        function cidrToMask(cidr) {
+            let mask = [];
+            for(let i = 0; i < 4; i++) {
+                mask.push(256 - Math.pow(2, Math.max(0, 8 - Math.max(0, Math.min(cidr - 8*i, 8)))));
+            }
+            return mask.join('.');
+        }
+
+        function maskToCidr(mask) {
+            return mask.split('.').reduce((acc, octet) => acc + (parseInt(octet).toString(2).match(/1/g) || []).length, 0);
+        }
+
+        function getNetworkId(ip, cidr) {
+            return intToIp(ipToInt(ip) & (-1 << (32 - cidr)));
+        }
+
+        function getBroadcast(ip, cidr) {
+            const mask = -1 << (32 - cidr);
+            return intToIp((ipToInt(ip) & mask) | (~mask >>> 0));
+        }
+
+        function getIpClass(ip) {
+            const first = parseInt(ip.split('.')[0]);
+            if (first >= 1 && first <= 126) return 'A';
+            if (first >= 128 && first <= 191) return 'B';
+            if (first >= 192 && first <= 223) return 'C';
+            if (first >= 224 && first <= 239) return 'D';
+            return 'E';
+        }
+
+        function isPrivate(ip) {
+            const parts = ip.split('.').map(Number);
+            if (parts[0] === 10) return true;
+            if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+            if (parts[0] === 192 && parts[1] === 168) return true;
+            if (parts[0] === 127) return true;
+            return false;
+        }
+
+        // ============================================
+        // STATE
+        // ============================================
+        let currentMode = 'drill';
+        let currentQuestion = {};
+        let questionNumber = 0;
+        let difficulty = 'easy';
+        let streak = 0;
+        let isBookmarked = false;
+        
+        // Challenge state
+        let challengeType = null;
+        let challengeActive = false;
+        let challengeTimer = null;
+        let challengeStartTime = null;
+        let challengeScore = 0;
+        let challengeLives = 3;
+        
+        // Stats
+        let stats = {
+            total: 0,
+            correct: 0,
+            streak: 0,
+            bestStreak: 0,
+            xp: 0,
+            level: 1,
+            categoryStats: {},
+            history: [],
+            achievements: [],
+            bookmarks: [],
+            challengeBests: { speed: null, survival: 0, timed: 0 }
+        };
+
+        const XP_PER_LEVEL = 100;
+        const XP_REWARDS = { easy: 5, medium: 10, hard: 20, expert: 35 };
+
+        const insults = ["PATHETIC.", "TRY STUDYING.", "NO.", "INCORRECT.", "SAD.", "RTFM.", "LAYER 8 ERROR.", "404 BRAIN NOT FOUND.", "WRONG SUBNET.", "PACKETS DROPPED."];
+        const praises = ["ADEQUATE.", "CORRECT.", "ACCEPTABLE.", "VALID.", "AFFIRMATIVE.", "PRECISE.", "CONFIRMED."];
+
+        // ============================================
+        // QUESTION REGISTRY (Expanded)
+        // ============================================
         const questionRegistry = [
+            // SUBNETTING
             {
                 id: 'cidr_to_mask',
                 label: 'CIDR to Subnet Mask',
+                category: 'Subnetting',
                 enabled: true,
-                fn: () => {
-                    const cidr = rand(8, 30);
-                    let mask = [];
-                    for(let i=0; i<4; i++) mask.push(256 - Math.pow(2, 8 - Math.max(0, Math.min(cidr - 8*i, 8))));
+                difficulty: ['easy', 'medium', 'hard', 'expert'],
+                fn: (diff) => {
+                    const ranges = { easy: [24, 30], medium: [16, 28], hard: [8, 30], expert: [1, 32] };
+                    const [min, max] = ranges[diff] || [24, 30];
+                    const cidr = rand(min, max);
                     return {
-                        q: `What is the Subnet Mask for /${cidr}?`,
-                        a: mask.join('.'),
-                        e: `/${cidr} means ${cidr} bits are set to 1. The mask is ${mask.join('.')}.`
+                        q: `Subnet Mask for /${cidr}?`,
+                        a: cidrToMask(cidr),
+                        e: `/${cidr} means ${cidr} network bits. Mask: ${cidrToMask(cidr)}`,
+                        hint: `Think about how many bits are 1s vs 0s`
+                    };
+                }
+            },
+            {
+                id: 'mask_to_cidr',
+                label: 'Subnet Mask to CIDR',
+                category: 'Subnetting',
+                enabled: true,
+                difficulty: ['easy', 'medium', 'hard', 'expert'],
+                fn: (diff) => {
+                    const ranges = { easy: [24, 30], medium: [16, 28], hard: [8, 30], expert: [1, 32] };
+                    const [min, max] = ranges[diff] || [24, 30];
+                    const cidr = rand(min, max);
+                    const mask = cidrToMask(cidr);
+                    return {
+                        q: `CIDR notation for ${mask}?`,
+                        a: `/${cidr}`,
+                        alt: [`${cidr}`, `/ ${cidr}`],
+                        e: `Count the 1-bits in binary: ${cidr}`,
+                        hint: `Convert each octet to binary and count 1s`
                     };
                 }
             },
             {
                 id: 'usable_hosts',
                 label: 'Usable Hosts Calculation',
+                category: 'Subnetting',
                 enabled: true,
-                fn: () => {
-                    const cidr = rand(16, 30);
+                difficulty: ['easy', 'medium', 'hard', 'expert'],
+                fn: (diff) => {
+                    const ranges = { easy: [24, 30], medium: [20, 28], hard: [16, 30], expert: [8, 30] };
+                    const [min, max] = ranges[diff] || [24, 30];
+                    const cidr = rand(min, max);
                     const hosts = Math.pow(2, 32 - cidr) - 2;
                     return {
-                        q: `How many usable hosts in a /${cidr} network?`,
+                        q: `Usable hosts in /${cidr}?`,
                         a: hosts.toString(),
-                        e: `Formula: 2^(32 - CIDR) - 2. 2^${32-cidr} - 2 = ${hosts}.`
+                        e: `2^(32-${cidr}) - 2 = 2^${32-cidr} - 2 = ${hosts}`,
+                        hint: `Formula: 2^(host bits) - 2`
+                    };
+                }
+            },
+            {
+                id: 'hosts_to_cidr',
+                label: 'Hosts Needed to CIDR',
+                category: 'Subnetting',
+                enabled: true,
+                difficulty: ['medium', 'hard', 'expert'],
+                fn: (diff) => {
+                    const hostOptions = { medium: [10, 50], hard: [100, 500], expert: [1000, 10000] };
+                    const [min, max] = hostOptions[diff] || [10, 50];
+                    const neededHosts = rand(min, max);
+                    const cidr = 32 - Math.ceil(Math.log2(neededHosts + 2));
+                    return {
+                        q: `Minimum CIDR for ${neededHosts} hosts?`,
+                        a: `/${cidr}`,
+                        alt: [`${cidr}`],
+                        e: `Need ${neededHosts}+2 addresses. 2^${32-cidr} = ${Math.pow(2, 32-cidr)}. CIDR: /${cidr}`,
+                        hint: `Find smallest power of 2 ≥ hosts + 2`
                     };
                 }
             },
             {
                 id: 'network_id',
                 label: 'Network ID Calculation',
+                category: 'Subnetting',
                 enabled: true,
-                fn: () => {
-                    const cidr = rand(24, 30);
-                    const ip = `192.168.${rand(0, 255)}.${rand(0, 255)}`;
-                    const netId = intToIp(ipToInt(ip) & (-1 << (32 - cidr)));
+                difficulty: ['easy', 'medium', 'hard', 'expert'],
+                fn: (diff) => {
+                    const ranges = { easy: [24, 28], medium: [20, 28], hard: [16, 30], expert: [8, 30] };
+                    const [min, max] = ranges[diff] || [24, 28];
+                    const cidr = rand(min, max);
+                    const ip = `${rand(1, 223)}.${rand(0, 255)}.${rand(0, 255)}.${rand(1, 254)}`;
+                    const netId = getNetworkId(ip, cidr);
                     return {
-                        q: `What is the Network ID for ${ip}/${cidr}?`,
+                        q: `Network ID for ${ip}/${cidr}?`,
                         a: netId,
-                        e: `Apply mask /${cidr}. Host bits zeroed out. ${ip} -> ${netId}.`
+                        e: `AND the IP with mask. Host bits zeroed → ${netId}`,
+                        hint: `Zero out the host bits (last ${32-cidr} bits)`
                     };
                 }
             },
             {
                 id: 'broadcast_id',
-                label: 'Broadcast ID Calculation',
+                label: 'Broadcast Address',
+                category: 'Subnetting',
                 enabled: true,
-                fn: () => {
-                    const cidr = rand(24, 30);
-                    const ip = `10.${rand(0, 255)}.${rand(0, 255)}.${rand(0, 255)}`;
-                    const mask = -1 << (32 - cidr);
-                    const bCast = intToIp((ipToInt(ip) & mask) | (~mask));
+                difficulty: ['easy', 'medium', 'hard', 'expert'],
+                fn: (diff) => {
+                    const ranges = { easy: [24, 28], medium: [20, 28], hard: [16, 30], expert: [8, 30] };
+                    const [min, max] = ranges[diff] || [24, 28];
+                    const cidr = rand(min, max);
+                    const ip = `${rand(1, 223)}.${rand(0, 255)}.${rand(0, 255)}.${rand(1, 254)}`;
+                    const bcast = getBroadcast(ip, cidr);
                     return {
-                        q: `What is the Broadcast ID for ${ip}/${cidr}?`,
-                        a: bCast,
-                        e: `Network ID | (inverted mask). Last address in block.`
+                        q: `Broadcast for ${ip}/${cidr}?`,
+                        a: bcast,
+                        e: `Set all host bits to 1 → ${bcast}`,
+                        hint: `Network ID with all host bits set to 1`
                     };
                 }
             },
             {
-                id: 'special_ips',
-                label: 'Special IP Functions (Loopback/Multi)',
+                id: 'first_host',
+                label: 'First Usable Host',
+                category: 'Subnetting',
                 enabled: true,
-                fn: () => {
-                    const type = rand(1, 3);
-                    if (type === 1) return { q: `Function of 127.${rand(0,255)}.${rand(0,255)}.1?`, a: "loopback", e: "127.0.0.0/8 is Loopback." };
-                    if (type === 2) return { q: `Class of ${rand(224, 239)}.${rand(0,255)}.${rand(0,255)}.5?`, a: "d", e: "Class D (224-239) is Multicast." };
-                    return { q: `Class of ${rand(240, 254)}.${rand(0,255)}.${rand(0,255)}.5?`, a: "e", e: "Class E (240-255) is Experimental." };
+                difficulty: ['easy', 'medium', 'hard'],
+                fn: (diff) => {
+                    const ranges = { easy: [24, 28], medium: [20, 28], hard: [16, 30] };
+                    const [min, max] = ranges[diff] || [24, 28];
+                    const cidr = rand(min, max);
+                    const ip = `${rand(1, 223)}.${rand(0, 255)}.${rand(0, 255)}.${rand(1, 254)}`;
+                    const netId = getNetworkId(ip, cidr);
+                    const firstHost = intToIp(ipToInt(netId) + 1);
+                    return {
+                        q: `First usable host in ${ip}/${cidr}?`,
+                        a: firstHost,
+                        e: `Network ID + 1 = ${firstHost}`,
+                        hint: `Network ID plus 1`
+                    };
                 }
             },
             {
-                id: 'class_id',
-                label: 'Identify Class by IP',
+                id: 'last_host',
+                label: 'Last Usable Host',
+                category: 'Subnetting',
                 enabled: true,
+                difficulty: ['easy', 'medium', 'hard'],
+                fn: (diff) => {
+                    const ranges = { easy: [24, 28], medium: [20, 28], hard: [16, 30] };
+                    const [min, max] = ranges[diff] || [24, 28];
+                    const cidr = rand(min, max);
+                    const ip = `${rand(1, 223)}.${rand(0, 255)}.${rand(0, 255)}.${rand(1, 254)}`;
+                    const bcast = getBroadcast(ip, cidr);
+                    const lastHost = intToIp(ipToInt(bcast) - 1);
+                    return {
+                        q: `Last usable host in ${ip}/${cidr}?`,
+                        a: lastHost,
+                        e: `Broadcast - 1 = ${lastHost}`,
+                        hint: `Broadcast address minus 1`
+                    };
+                }
+            },
+            {
+                id: 'wildcard_mask',
+                label: 'Wildcard Mask',
+                category: 'Subnetting',
+                enabled: true,
+                difficulty: ['medium', 'hard', 'expert'],
+                fn: (diff) => {
+                    const ranges = { medium: [20, 28], hard: [16, 30], expert: [8, 30] };
+                    const [min, max] = ranges[diff] || [20, 28];
+                    const cidr = rand(min, max);
+                    const mask = cidrToMask(cidr).split('.').map(Number);
+                    const wildcard = mask.map(o => 255 - o).join('.');
+                    return {
+                        q: `Wildcard mask for /${cidr}?`,
+                        a: wildcard,
+                        e: `255.255.255.255 - ${cidrToMask(cidr)} = ${wildcard}`,
+                        hint: `Subtract subnet mask from 255.255.255.255`
+                    };
+                }
+            },
+            {
+                id: 'block_size',
+                label: 'Block Size / Magic Number',
+                category: 'Subnetting',
+                enabled: true,
+                difficulty: ['medium', 'hard'],
+                fn: (diff) => {
+                    const masks = { medium: [192, 224, 240, 248], hard: [128, 192, 224, 240, 248, 252, 254] };
+                    const opts = masks[diff] || [192, 224, 240];
+                    const maskOctet = opts[rand(0, opts.length - 1)];
+                    const blockSize = 256 - maskOctet;
+                    return {
+                        q: `Block size for mask octet ${maskOctet}?`,
+                        a: blockSize.toString(),
+                        e: `256 - ${maskOctet} = ${blockSize}`,
+                        hint: `Subtract from 256`
+                    };
+                }
+            },
+            {
+                id: 'num_subnets',
+                label: 'Number of Subnets',
+                category: 'Subnetting',
+                enabled: true,
+                difficulty: ['hard', 'expert'],
+                fn: (diff) => {
+                    const baseC = { hard: [24, 28], expert: [16, 30] };
+                    const [minBase, maxNew] = baseC[diff] || [24, 28];
+                    const baseCidr = rand(minBase, minBase + 2);
+                    const newCidr = rand(baseCidr + 1, Math.min(baseCidr + 6, maxNew));
+                    const borrowed = newCidr - baseCidr;
+                    const subnets = Math.pow(2, borrowed);
+                    return {
+                        q: `Subnets from /${baseCidr} to /${newCidr}?`,
+                        a: subnets.toString(),
+                        e: `Borrowed ${borrowed} bits. 2^${borrowed} = ${subnets} subnets`,
+                        hint: `Calculate borrowed bits, then 2^borrowed`
+                    };
+                }
+            },
+
+            // IP ADDRESSING
+            {
+                id: 'class_id',
+                label: 'IP Class Identification',
+                category: 'IP Addressing',
+                enabled: true,
+                difficulty: ['easy', 'medium'],
                 fn: () => {
-                    const type = rand(1, 3); 
-                    if (type === 1) return { q: `Class of ${rand(1, 126)}.${rand(0,255)}.x.x?`, a: "A", e: "Class A: 1-126" };
-                    if (type === 2) return { q: `Class of ${rand(128, 191)}.${rand(0,255)}.x.x?`, a: "B", e: "Class B: 128-191" };
-                    return { q: `Class of ${rand(192, 223)}.${rand(0,255)}.x.x?`, a: "C", e: "Class C: 192-223" };
+                    const type = rand(1, 3);
+                    const first = type === 1 ? rand(1, 126) : type === 2 ? rand(128, 191) : rand(192, 223);
+                    const cls = type === 1 ? 'A' : type === 2 ? 'B' : 'C';
+                    return {
+                        q: `IP class of ${first}.${rand(0,255)}.${rand(0,255)}.${rand(1,254)}?`,
+                        a: cls,
+                        e: `First octet ${first} is Class ${cls}`,
+                        hint: `A: 1-126, B: 128-191, C: 192-223`
+                    };
                 }
             },
             {
                 id: 'class_ranges',
-                label: 'First Octet Ranges (Start/End)',
+                label: 'Class First Octet Range',
+                category: 'IP Addressing',
                 enabled: true,
+                difficulty: ['easy', 'medium'],
                 fn: () => {
                     const classes = [
                         { name: "Class A", range: "1-126" },
                         { name: "Class B", range: "128-191" },
                         { name: "Class C", range: "192-223" },
-                        { name: "Multicast (Class D)", range: "224-239" },
-                        { name: "Experimental (Class E)", range: "240-255" }
+                        { name: "Class D (Multicast)", range: "224-239" },
+                        { name: "Class E (Experimental)", range: "240-255" }
                     ];
                     const s = classes[rand(0, classes.length - 1)];
-                    return { q: `First octet range for ${s.name}?`, a: s.range, e: `${s.name} starts/ends at ${s.range}.` };
+                    return {
+                        q: `First octet range for ${s.name}?`,
+                        a: s.range,
+                        e: `${s.name}: ${s.range}`,
+                        hint: `Remember: A, B, C, D, E in order`
+                    };
+                }
+            },
+            {
+                id: 'private_public',
+                label: 'Private vs Public IP',
+                category: 'IP Addressing',
+                enabled: true,
+                difficulty: ['easy', 'medium'],
+                fn: () => {
+                    const type = rand(1, 4);
+                    let ip, answer;
+                    if (type === 1) { ip = `10.${rand(0,255)}.${rand(0,255)}.${rand(1,254)}`; answer = 'private'; }
+                    else if (type === 2) { ip = `172.${rand(16,31)}.${rand(0,255)}.${rand(1,254)}`; answer = 'private'; }
+                    else if (type === 3) { ip = `192.168.${rand(0,255)}.${rand(1,254)}`; answer = 'private'; }
+                    else { ip = `${rand(1,9)}.${rand(0,255)}.${rand(0,255)}.${rand(1,254)}`; answer = 'public'; }
+                    return {
+                        q: `Is ${ip} private or public?`,
+                        a: answer,
+                        e: `${ip} is ${answer}. Private: 10.x, 172.16-31.x, 192.168.x`,
+                        hint: `Check against RFC 1918 ranges`
+                    };
+                }
+            },
+            {
+                id: 'special_ips',
+                label: 'Special IP Identification',
+                category: 'IP Addressing',
+                enabled: true,
+                difficulty: ['easy', 'medium'],
+                fn: () => {
+                    const type = rand(1, 4);
+                    if (type === 1) return { q: `Function of 127.${rand(0,255)}.${rand(0,255)}.${rand(1,254)}?`, a: "loopback", e: "127.0.0.0/8 is loopback range", hint: "Localhost" };
+                    if (type === 2) return { q: `What type: ${rand(224, 239)}.${rand(0,255)}.${rand(0,255)}.${rand(0,255)}?`, a: "multicast", e: "224-239 is Class D / Multicast", hint: "Class D range" };
+                    if (type === 3) return { q: `Type of 169.254.${rand(0,255)}.${rand(1,254)}?`, a: "link-local", alt: ["apipa", "link local"], e: "169.254.x.x is APIPA/Link-Local", hint: "Self-assigned when no DHCP" };
+                    return { q: `Type of 0.0.0.0?`, a: "default", alt: ["unspecified", "any"], e: "0.0.0.0 is default/unspecified", hint: "Used in routing" };
+                }
+            },
+            {
+                id: 'default_mask',
+                label: 'Classful Default Mask',
+                category: 'IP Addressing',
+                enabled: true,
+                difficulty: ['easy', 'medium'],
+                fn: () => {
+                    const type = rand(1, 3);
+                    let ip, mask;
+                    if (type === 1) { ip = `${rand(1, 126)}.x.x.x`; mask = '255.0.0.0'; }
+                    else if (type === 2) { ip = `${rand(128, 191)}.x.x.x`; mask = '255.255.0.0'; }
+                    else { ip = `${rand(192, 223)}.x.x.x`; mask = '255.255.255.0'; }
+                    return {
+                        q: `Default classful mask for ${ip}?`,
+                        a: mask,
+                        e: `Class ${type === 1 ? 'A' : type === 2 ? 'B' : 'C'} default: ${mask}`,
+                        hint: `A=/8, B=/16, C=/24`
+                    };
+                }
+            },
+
+            // BINARY CONVERSION
+            {
+                id: 'dec_to_bin',
+                label: 'Decimal to Binary',
+                category: 'Binary',
+                enabled: true,
+                difficulty: ['easy', 'medium', 'hard'],
+                fn: (diff) => {
+                    const ranges = { easy: [0, 15], medium: [16, 127], hard: [128, 255] };
+                    const [min, max] = ranges[diff] || [0, 15];
+                    const dec = rand(min, max);
+                    const bin = decToBin(dec);
+                    return {
+                        q: `${dec} in 8-bit binary?`,
+                        a: bin,
+                        e: `${dec} = ${bin}`,
+                        hint: `Powers of 2: 128, 64, 32, 16, 8, 4, 2, 1`
+                    };
+                }
+            },
+            {
+                id: 'bin_to_dec',
+                label: 'Binary to Decimal',
+                category: 'Binary',
+                enabled: true,
+                difficulty: ['easy', 'medium', 'hard'],
+                fn: (diff) => {
+                    const ranges = { easy: [0, 15], medium: [16, 127], hard: [128, 255] };
+                    const [min, max] = ranges[diff] || [0, 15];
+                    const dec = rand(min, max);
+                    const bin = decToBin(dec);
+                    return {
+                        q: `Binary ${bin} in decimal?`,
+                        a: dec.toString(),
+                        e: `${bin} = ${dec}`,
+                        hint: `Add up the 1-bit positions`
+                    };
+                }
+            },
+            {
+                id: 'ip_octet_binary',
+                label: 'IP Octet to Binary',
+                category: 'Binary',
+                enabled: true,
+                difficulty: ['medium', 'hard'],
+                fn: () => {
+                    const octet = rand(0, 255);
+                    return {
+                        q: `IP octet ${octet} in binary?`,
+                        a: decToBin(octet),
+                        e: `${octet} = ${decToBin(octet)}`,
+                        hint: `8-bit representation`
+                    };
+                }
+            },
+
+            // PORTS & PROTOCOLS
+            {
+                id: 'port_to_service',
+                label: 'Port to Service',
+                category: 'Ports',
+                enabled: true,
+                difficulty: ['easy', 'medium', 'hard'],
+                fn: (diff) => {
+                    const ports = {
+                        easy: [
+                            { port: 80, service: "http" },
+                            { port: 443, service: "https" },
+                            { port: 22, service: "ssh" },
+                            { port: 21, service: "ftp" },
+                            { port: 53, service: "dns" }
+                        ],
+                        medium: [
+                            { port: 25, service: "smtp" },
+                            { port: 110, service: "pop3" },
+                            { port: 143, service: "imap" },
+                            { port: 3389, service: "rdp" },
+                            { port: 23, service: "telnet" }
+                        ],
+                        hard: [
+                            { port: 67, service: "dhcp", alt: ["dhcp server", "bootps"] },
+                            { port: 68, service: "dhcp", alt: ["dhcp client", "bootpc"] },
+                            { port: 161, service: "snmp" },
+                            { port: 514, service: "syslog" },
+                            { port: 69, service: "tftp" },
+                            { port: 123, service: "ntp" }
+                        ]
+                    };
+                    const list = ports[diff] || ports.easy;
+                    const p = list[rand(0, list.length - 1)];
+                    return {
+                        q: `Service on port ${p.port}?`,
+                        a: p.service,
+                        alt: p.alt,
+                        e: `Port ${p.port} = ${p.service.toUpperCase()}`,
+                        hint: `Common network service`
+                    };
+                }
+            },
+            {
+                id: 'service_to_port',
+                label: 'Service to Port',
+                category: 'Ports',
+                enabled: true,
+                difficulty: ['easy', 'medium', 'hard'],
+                fn: (diff) => {
+                    const services = {
+                        easy: [
+                            { service: "HTTP", port: "80" },
+                            { service: "HTTPS", port: "443" },
+                            { service: "SSH", port: "22" },
+                            { service: "FTP", port: "21", alt: ["20-21", "20, 21"] },
+                            { service: "DNS", port: "53" }
+                        ],
+                        medium: [
+                            { service: "SMTP", port: "25" },
+                            { service: "POP3", port: "110" },
+                            { service: "IMAP", port: "143" },
+                            { service: "RDP", port: "3389" },
+                            { service: "Telnet", port: "23" }
+                        ],
+                        hard: [
+                            { service: "DHCP (Server)", port: "67" },
+                            { service: "SNMP", port: "161" },
+                            { service: "Syslog", port: "514" },
+                            { service: "TFTP", port: "69" },
+                            { service: "NTP", port: "123" }
+                        ]
+                    };
+                    const list = services[diff] || services.easy;
+                    const s = list[rand(0, list.length - 1)];
+                    return {
+                        q: `Default port for ${s.service}?`,
+                        a: s.port,
+                        alt: s.alt,
+                        e: `${s.service} uses port ${s.port}`,
+                        hint: `Well-known port number`
+                    };
+                }
+            },
+            {
+                id: 'tcp_udp',
+                label: 'TCP vs UDP',
+                category: 'Ports',
+                enabled: true,
+                difficulty: ['medium', 'hard'],
+                fn: () => {
+                    const protocols = [
+                        { name: "HTTP", type: "tcp" },
+                        { name: "DNS query", type: "udp", alt: ["both", "udp/tcp"] },
+                        { name: "DHCP", type: "udp" },
+                        { name: "FTP", type: "tcp" },
+                        { name: "SSH", type: "tcp" },
+                        { name: "TFTP", type: "udp" },
+                        { name: "SNMP", type: "udp" },
+                        { name: "Telnet", type: "tcp" },
+                        { name: "NTP", type: "udp" },
+                        { name: "SMTP", type: "tcp" }
+                    ];
+                    const p = protocols[rand(0, protocols.length - 1)];
+                    return {
+                        q: `${p.name}: TCP or UDP?`,
+                        a: p.type,
+                        alt: p.alt,
+                        e: `${p.name} primarily uses ${p.type.toUpperCase()}`,
+                        hint: `Connection-oriented = TCP, Connectionless = UDP`
+                    };
+                }
+            },
+
+            // NETWORKING CONCEPTS
+            {
+                id: 'osi_layer_num',
+                label: 'OSI Layer Number',
+                category: 'Concepts',
+                enabled: true,
+                difficulty: ['easy', 'medium'],
+                fn: () => {
+                    const layers = [
+                        { name: "Physical", num: "1" },
+                        { name: "Data Link", num: "2" },
+                        { name: "Network", num: "3" },
+                        { name: "Transport", num: "4" },
+                        { name: "Session", num: "5" },
+                        { name: "Presentation", num: "6" },
+                        { name: "Application", num: "7" }
+                    ];
+                    const l = layers[rand(0, layers.length - 1)];
+                    return {
+                        q: `OSI layer number for ${l.name}?`,
+                        a: l.num,
+                        e: `${l.name} = Layer ${l.num}`,
+                        hint: `Please Do Not Throw Sausage Pizza Away`
+                    };
+                }
+            },
+            {
+                id: 'osi_layer_name',
+                label: 'OSI Layer Name',
+                category: 'Concepts',
+                enabled: true,
+                difficulty: ['easy', 'medium'],
+                fn: () => {
+                    const layers = [
+                        { num: 1, name: "physical" },
+                        { num: 2, name: "data link", alt: ["datalink", "data-link"] },
+                        { num: 3, name: "network" },
+                        { num: 4, name: "transport" },
+                        { num: 5, name: "session" },
+                        { num: 6, name: "presentation" },
+                        { num: 7, name: "application" }
+                    ];
+                    const l = layers[rand(0, layers.length - 1)];
+                    return {
+                        q: `OSI layer ${l.num} name?`,
+                        a: l.name,
+                        alt: l.alt,
+                        e: `Layer ${l.num} = ${l.name.charAt(0).toUpperCase() + l.name.slice(1)}`,
+                        hint: `Please Do Not Throw Sausage Pizza Away`
+                    };
+                }
+            },
+            {
+                id: 'protocol_layer',
+                label: 'Protocol to OSI Layer',
+                category: 'Concepts',
+                enabled: true,
+                difficulty: ['medium', 'hard'],
+                fn: () => {
+                    const protocols = [
+                        { proto: "IP", layer: "3", name: "Network" },
+                        { proto: "TCP", layer: "4", name: "Transport" },
+                        { proto: "UDP", layer: "4", name: "Transport" },
+                        { proto: "HTTP", layer: "7", name: "Application" },
+                        { proto: "Ethernet", layer: "2", name: "Data Link" },
+                        { proto: "ARP", layer: "2", name: "Data Link" },
+                        { proto: "ICMP", layer: "3", name: "Network" }
+                    ];
+                    const p = protocols[rand(0, protocols.length - 1)];
+                    return {
+                        q: `${p.proto} operates at OSI layer?`,
+                        a: p.layer,
+                        e: `${p.proto} = Layer ${p.layer} (${p.name})`,
+                        hint: `Think about what the protocol does`
+                    };
+                }
+            },
+            {
+                id: 'same_network',
+                label: 'Same Network Check',
+                category: 'Subnetting',
+                enabled: true,
+                difficulty: ['medium', 'hard', 'expert'],
+                fn: (diff) => {
+                    const cidr = diff === 'medium' ? rand(24, 28) : diff === 'hard' ? rand(20, 28) : rand(16, 30);
+                    const base = `${rand(1,223)}.${rand(0,255)}.${rand(0,255)}`;
+                    const ip1 = `${base}.${rand(1, 127)}`;
+                    const sameNet = rand(0, 1) === 1;
+                    let ip2;
+                    
+                    if (sameNet) {
+                        const net1 = getNetworkId(ip1, cidr);
+                        const bcast1 = getBroadcast(ip1, cidr);
+                        const netInt = ipToInt(net1);
+                        const bcastInt = ipToInt(bcast1);
+                        ip2 = intToIp(rand(netInt + 1, bcastInt - 1));
+                    } else {
+                        ip2 = `${rand(1,223)}.${rand(0,255)}.${rand(0,255)}.${rand(1,254)}`;
+                        while (getNetworkId(ip1, cidr) === getNetworkId(ip2, cidr)) {
+                            ip2 = `${rand(1,223)}.${rand(0,255)}.${rand(0,255)}.${rand(1,254)}`;
+                        }
+                    }
+                    
+                    return {
+                        q: `Same network? ${ip1} & ${ip2} (/${cidr})`,
+                        a: sameNet ? "yes" : "no",
+                        alt: sameNet ? ["true", "y", "1"] : ["false", "n", "0"],
+                        e: `Network IDs: ${getNetworkId(ip1, cidr)} vs ${getNetworkId(ip2, cidr)}`,
+                        hint: `Compare the network IDs`
+                    };
+                }
+            },
+            {
+                id: 'subnet_contains_ip',
+                label: 'IP in Subnet Check',
+                category: 'Subnetting',
+                enabled: true,
+                difficulty: ['hard', 'expert'],
+                fn: () => {
+                    const cidr = rand(24, 28);
+                    const netBase = `${rand(1,223)}.${rand(0,255)}.${rand(0,255)}.0`;
+                    const netId = getNetworkId(netBase, cidr);
+                    const inSubnet = rand(0, 1) === 1;
+                    let testIp;
+                    
+                    if (inSubnet) {
+                        const netInt = ipToInt(netId);
+                        const hosts = Math.pow(2, 32 - cidr) - 2;
+                        testIp = intToIp(netInt + rand(1, hosts));
+                    } else {
+                        testIp = `${rand(1,223)}.${rand(0,255)}.${rand(0,255)}.${rand(1,254)}`;
+                        while (getNetworkId(testIp, cidr) === netId) {
+                            testIp = `${rand(1,223)}.${rand(0,255)}.${rand(0,255)}.${rand(1,254)}`;
+                        }
+                    }
+                    
+                    return {
+                        q: `Is ${testIp} in ${netId}/${cidr}?`,
+                        a: inSubnet ? "yes" : "no",
+                        alt: inSubnet ? ["true", "y"] : ["false", "n"],
+                        e: `${testIp} network = ${getNetworkId(testIp, cidr)}. ${inSubnet ? 'Matches' : 'Does not match'} ${netId}`,
+                        hint: `Calculate the network ID of the test IP`
+                    };
                 }
             }
         ];
 
-        // --- State ---
-        let currentQuestion = {};
-        const insults = ["PATHETIC.", "TRY STUDYING.", "NO.", "INCORRECT.", "SAD.", "RTFM.", "LAYER 8 ERROR."];
-        const inputField = document.getElementById('input-field');
-        const feedbackDiv = document.getElementById('feedback');
-        const feedbackText = document.getElementById('feedback-text');
-        const solutionDiv = document.getElementById('solution');
-        
-        // --- Settings Logic ---
-        function loadSettings() {
-            const saved = localStorage.getItem('ipDrillSettings');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                questionRegistry.forEach(item => {
-                    if (parsed.hasOwnProperty(item.id)) {
-                        item.enabled = parsed[item.id];
+        // ============================================
+        // ACHIEVEMENTS
+        // ============================================
+        const achievementDefs = [
+            { id: 'first_blood', name: 'First Blood', icon: '🩸', desc: 'Answer your first question correctly', condition: () => stats.correct >= 1 },
+            { id: 'streak_5', name: 'On Fire', icon: '🔥', desc: 'Get a 5 answer streak', condition: () => stats.bestStreak >= 5 },
+            { id: 'streak_10', name: 'Unstoppable', icon: '⚡', desc: 'Get a 10 answer streak', condition: () => stats.bestStreak >= 10 },
+            { id: 'streak_25', name: 'Legendary', icon: '👑', desc: 'Get a 25 answer streak', condition: () => stats.bestStreak >= 25 },
+            { id: 'century', name: 'Century', icon: '💯', desc: 'Answer 100 questions', condition: () => stats.total >= 100 },
+            { id: 'thousand', name: 'Network Admin', icon: '🖥️', desc: 'Answer 1000 questions', condition: () => stats.total >= 1000 },
+            { id: 'perfect_10', name: 'Perfect 10', icon: '🎯', desc: 'Get 10 correct in a row', condition: () => stats.bestStreak >= 10 },
+            { id: 'level_5', name: 'Apprentice', icon: '📚', desc: 'Reach level 5', condition: () => stats.level >= 5 },
+            { id: 'level_10', name: 'Expert', icon: '🎓', desc: 'Reach level 10', condition: () => stats.level >= 10 },
+            { id: 'level_25', name: 'Master', icon: '🏅', desc: 'Reach level 25', condition: () => stats.level >= 25 },
+            { id: 'speed_demon', name: 'Speed Demon', icon: '💨', desc: 'Complete Speed Run under 2 minutes', condition: () => stats.challengeBests.speed && stats.challengeBests.speed < 120 },
+            { id: 'survivor', name: 'Survivor', icon: '🛡️', desc: 'Reach 20 in Survival mode', condition: () => stats.challengeBests.survival >= 20 },
+            { id: 'time_lord', name: 'Time Lord', icon: '⏰', desc: 'Score 15+ in Time Attack', condition: () => stats.challengeBests.timed >= 15 }
+        ];
+
+        // ============================================
+        // LEARNING MODULES
+        // ============================================
+        const learnModules = [
+            {
+                id: 'subnetting_basics',
+                title: 'Subnetting Basics',
+                icon: '🌐',
+                pages: [
+                    {
+                        title: 'What is Subnetting?',
+                        content: `<p class="text-gray-300 mb-4">Subnetting is the process of dividing a network into smaller networks called subnets. This is done by borrowing bits from the host portion of an IP address to create a subnet ID.</p>
+                        <div class="bg-zinc-800 p-4 font-mono text-sm">
+                            <div class="text-cyan-400">IP Address Structure:</div>
+                            <div class="text-gray-300 mt-2">[Network ID] [Subnet ID] [Host ID]</div>
+                        </div>`
+                    },
+                    {
+                        title: 'CIDR Notation',
+                        content: `<p class="text-gray-300 mb-4">CIDR (Classless Inter-Domain Routing) notation uses a suffix to indicate the number of network bits.</p>
+                        <div class="bg-zinc-800 p-4 font-mono text-sm space-y-2">
+                            <div><span class="text-cyan-400">192.168.1.0/24</span> = 24 network bits, 8 host bits</div>
+                            <div><span class="text-cyan-400">10.0.0.0/8</span> = 8 network bits, 24 host bits</div>
+                            <div><span class="text-cyan-400">172.16.0.0/16</span> = 16 network bits, 16 host bits</div>
+                        </div>`
+                    },
+                    {
+                        title: 'Subnet Masks',
+                        content: `<p class="text-gray-300 mb-4">A subnet mask determines which portion of an IP address is the network ID and which is the host ID.</p>
+                        <table class="w-full text-sm mt-4">
+                            <tr class="border-b border-zinc-700"><td class="py-2 text-cyan-400">/24</td><td class="py-2 text-gray-300">255.255.255.0</td><td class="py-2 text-gray-500">254 hosts</td></tr>
+                            <tr class="border-b border-zinc-700"><td class="py-2 text-cyan-400">/25</td><td class="py-2 text-gray-300">255.255.255.128</td><td class="py-2 text-gray-500">126 hosts</td></tr>
+                            <tr class="border-b border-zinc-700"><td class="py-2 text-cyan-400">/26</td><td class="py-2 text-gray-300">255.255.255.192</td><td class="py-2 text-gray-500">62 hosts</td></tr>
+                            <tr class="border-b border-zinc-700"><td class="py-2 text-cyan-400">/27</td><td class="py-2 text-gray-300">255.255.255.224</td><td class="py-2 text-gray-500">30 hosts</td></tr>
+                            <tr><td class="py-2 text-cyan-400">/28</td><td class="py-2 text-gray-300">255.255.255.240</td><td class="py-2 text-gray-500">14 hosts</td></tr>
+                        </table>`
+                    },
+                    {
+                        title: 'Calculating Usable Hosts',
+                        content: `<p class="text-gray-300 mb-4">The formula for calculating usable hosts in a subnet:</p>
+                        <div class="bg-zinc-800 p-4 font-mono text-center text-xl text-cyan-400 mb-4">
+                            2<sup>(32 - CIDR)</sup> - 2
+                        </div>
+                        <p class="text-gray-400 text-sm">We subtract 2 because:</p>
+                        <ul class="text-gray-400 text-sm mt-2 space-y-1">
+                            <li>• <span class="text-red-400">Network ID</span> - First address (all host bits 0)</li>
+                            <li>• <span class="text-yellow-400">Broadcast</span> - Last address (all host bits 1)</li>
+                        </ul>`
+                    },
+                    {
+                        title: 'Practice Problem',
+                        content: `<p class="text-gray-300 mb-4">Given the network 192.168.10.0/26, find:</p>
+                        <div class="space-y-3 text-sm">
+                            <div class="bg-zinc-800 p-3"><span class="text-gray-500">Subnet Mask:</span> <span class="text-cyan-400">255.255.255.192</span></div>
+                            <div class="bg-zinc-800 p-3"><span class="text-gray-500">Usable Hosts:</span> <span class="text-cyan-400">2^6 - 2 = 62</span></div>
+                            <div class="bg-zinc-800 p-3"><span class="text-gray-500">Network ID:</span> <span class="text-cyan-400">192.168.10.0</span></div>
+                            <div class="bg-zinc-800 p-3"><span class="text-gray-500">Broadcast:</span> <span class="text-cyan-400">192.168.10.63</span></div>
+                            <div class="bg-zinc-800 p-3"><span class="text-gray-500">First Host:</span> <span class="text-cyan-400">192.168.10.1</span></div>
+                            <div class="bg-zinc-800 p-3"><span class="text-gray-500">Last Host:</span> <span class="text-cyan-400">192.168.10.62</span></div>
+                        </div>`
                     }
-                });
+                ]
+            },
+            {
+                id: 'binary_math',
+                title: 'Binary Mathematics',
+                icon: '🔢',
+                pages: [
+                    {
+                        title: 'Binary Basics',
+                        content: `<p class="text-gray-300 mb-4">In networking, we work with 8-bit (octet) binary numbers. Each bit represents a power of 2.</p>
+                        <div class="bg-zinc-800 p-4 font-mono text-sm">
+                            <div class="grid grid-cols-8 gap-2 text-center mb-2">
+                                <div class="text-cyan-400">128</div>
+                                <div class="text-cyan-400">64</div>
+                                <div class="text-cyan-400">32</div>
+                                <div class="text-cyan-400">16</div>
+                                <div class="text-cyan-400">8</div>
+                                <div class="text-cyan-400">4</div>
+                                <div class="text-cyan-400">2</div>
+                                <div class="text-cyan-400">1</div>
+                            </div>
+                            <div class="grid grid-cols-8 gap-2 text-center text-gray-500 text-xs">
+                                <div>2^7</div><div>2^6</div><div>2^5</div><div>2^4</div>
+                                <div>2^3</div><div>2^2</div><div>2^1</div><div>2^0</div>
+                            </div>
+                        </div>`
+                    },
+                    {
+                        title: 'Converting Decimal to Binary',
+                        content: `<p class="text-gray-300 mb-4">To convert decimal to binary, subtract powers of 2 from largest to smallest:</p>
+                        <div class="bg-zinc-800 p-4 font-mono text-sm">
+                            <div class="text-yellow-400 mb-2">Example: Convert 200 to binary</div>
+                            <div class="space-y-1 text-gray-300">
+                                <div>200 - 128 = 72 → <span class="text-green-400">1</span></div>
+                                <div>72 - 64 = 8 → <span class="text-green-400">1</span></div>
+                                <div>8 - 32? No → <span class="text-red-400">0</span></div>
+                                <div>8 - 16? No → <span class="text-red-400">0</span></div>
+                                <div>8 - 8 = 0 → <span class="text-green-400">1</span></div>
+                                <div>0 - 4? No → <span class="text-red-400">0</span></div>
+                                <div>0 - 2? No → <span class="text-red-400">0</span></div>
+                                <div>0 - 1? No → <span class="text-red-400">0</span></div>
+                            </div>
+                            <div class="text-cyan-400 mt-2">Result: 11001000</div>
+                        </div>`
+                    },
+                    {
+                        title: 'Converting Binary to Decimal',
+                        content: `<p class="text-gray-300 mb-4">Add up the values where there's a 1:</p>
+                        <div class="bg-zinc-800 p-4 font-mono text-sm">
+                            <div class="text-yellow-400 mb-2">Example: Convert 11000000 to decimal</div>
+                            <div class="grid grid-cols-8 gap-2 text-center mb-2">
+                                <div class="text-cyan-400">128</div>
+                                <div class="text-cyan-400">64</div>
+                                <div class="text-gray-600">32</div>
+                                <div class="text-gray-600">16</div>
+                                <div class="text-gray-600">8</div>
+                                <div class="text-gray-600">4</div>
+                                <div class="text-gray-600">2</div>
+                                <div class="text-gray-600">1</div>
+                            </div>
+                            <div class="grid grid-cols-8 gap-2 text-center">
+                                <div class="text-green-400">1</div>
+                                <div class="text-green-400">1</div>
+                                <div class="text-red-400">0</div>
+                                <div class="text-red-400">0</div>
+                                <div class="text-red-400">0</div>
+                                <div class="text-red-400">0</div>
+                                <div class="text-red-400">0</div>
+                                <div class="text-red-400">0</div>
+                            </div>
+                            <div class="text-cyan-400 mt-3">128 + 64 = 192</div>
+                        </div>`
+                    },
+                    {
+                        title: 'Binary AND Operation',
+                        content: `<p class="text-gray-300 mb-4">The AND operation is used to find the Network ID. Both bits must be 1 for the result to be 1.</p>
+                        <div class="bg-zinc-800 p-4 font-mono text-sm">
+                            <div class="text-yellow-400 mb-2">Example: 192.168.1.50 AND 255.255.255.0</div>
+                            <div class="space-y-1">
+                                <div><span class="text-gray-500">IP:</span> <span class="text-gray-300">11000000.10101000.00000001.00110010</span></div>
+                                <div><span class="text-gray-500">Mask:</span> <span class="text-gray-300">11111111.11111111.11111111.00000000</span></div>
+                                <div class="border-t border-zinc-600 pt-1"><span class="text-gray-500">AND:</span> <span class="text-cyan-400">11000000.10101000.00000001.00000000</span></div>
+                            </div>
+                            <div class="text-cyan-400 mt-2">Result: 192.168.1.0 (Network ID)</div>
+                        </div>`
+                    }
+                ]
+            },
+            {
+                id: 'ip_classes',
+                title: 'IP Address Classes',
+                icon: '📍',
+                pages: [
+                    {
+                        title: 'Classful Addressing',
+                        content: `<p class="text-gray-300 mb-4">Originally, IP addresses were divided into classes based on the first octet:</p>
+                        <table class="w-full text-sm">
+                            <tr class="border-b border-zinc-700">
+                                <td class="py-2 text-cyan-400 font-bold">Class A</td>
+                                <td class="py-2 text-gray-300">1-126</td>
+                                <td class="py-2 text-gray-500">/8 default</td>
+                            </tr>
+                            <tr class="border-b border-zinc-700">
+                                <td class="py-2 text-green-400 font-bold">Class B</td>
+                                <td class="py-2 text-gray-300">128-191</td>
+                                <td class="py-2 text-gray-500">/16 default</td>
+                            </tr>
+                            <tr class="border-b border-zinc-700">
+                                <td class="py-2 text-yellow-400 font-bold">Class C</td>
+                                <td class="py-2 text-gray-300">192-223</td>
+                                <td class="py-2 text-gray-500">/24 default</td>
+                            </tr>
+                            <tr class="border-b border-zinc-700">
+                                <td class="py-2 text-purple-400 font-bold">Class D</td>
+                                <td class="py-2 text-gray-300">224-239</td>
+                                <td class="py-2 text-gray-500">Multicast</td>
+                            </tr>
+                            <tr>
+                                <td class="py-2 text-red-400 font-bold">Class E</td>
+                                <td class="py-2 text-gray-300">240-255</td>
+                                <td class="py-2 text-gray-500">Experimental</td>
+                            </tr>
+                        </table>`
+                    },
+                    {
+                        title: 'Private IP Ranges (RFC 1918)',
+                        content: `<p class="text-gray-300 mb-4">These ranges are reserved for private networks and cannot be routed on the internet:</p>
+                        <div class="space-y-3">
+                            <div class="bg-zinc-800 p-3">
+                                <div class="text-cyan-400 font-bold">Class A Private</div>
+                                <div class="text-gray-300 font-mono">10.0.0.0 - 10.255.255.255</div>
+                                <div class="text-gray-500 text-sm">10.0.0.0/8 (16 million addresses)</div>
+                            </div>
+                            <div class="bg-zinc-800 p-3">
+                                <div class="text-green-400 font-bold">Class B Private</div>
+                                <div class="text-gray-300 font-mono">172.16.0.0 - 172.31.255.255</div>
+                                <div class="text-gray-500 text-sm">172.16.0.0/12 (1 million addresses)</div>
+                            </div>
+                            <div class="bg-zinc-800 p-3">
+                                <div class="text-yellow-400 font-bold">Class C Private</div>
+                                <div class="text-gray-300 font-mono">192.168.0.0 - 192.168.255.255</div>
+                                <div class="text-gray-500 text-sm">192.168.0.0/16 (65,536 addresses)</div>
+                            </div>
+                        </div>`
+                    },
+                    {
+                        title: 'Special Addresses',
+                        content: `<div class="space-y-3">
+                            <div class="bg-zinc-800 p-3">
+                                <div class="text-cyan-400 font-bold">Loopback</div>
+                                <div class="text-gray-300 font-mono">127.0.0.0/8</div>
+                                <div class="text-gray-500 text-sm">Used for localhost testing</div>
+                            </div>
+                            <div class="bg-zinc-800 p-3">
+                                <div class="text-yellow-400 font-bold">Link-Local (APIPA)</div>
+                                <div class="text-gray-300 font-mono">169.254.0.0/16</div>
+                                <div class="text-gray-500 text-sm">Auto-assigned when DHCP fails</div>
+                            </div>
+                            <div class="bg-zinc-800 p-3">
+                                <div class="text-gray-400 font-bold">Default/Any</div>
+                                <div class="text-gray-300 font-mono">0.0.0.0</div>
+                                <div class="text-gray-500 text-sm">Default route, unspecified address</div>
+                            </div>
+                            <div class="bg-zinc-800 p-3">
+                                <div class="text-red-400 font-bold">Broadcast</div>
+                                <div class="text-gray-300 font-mono">255.255.255.255</div>
+                                <div class="text-gray-500 text-sm">Limited broadcast (local network only)</div>
+                            </div>
+                        </div>`
+                    }
+                ]
+            },
+            {
+                id: 'vlsm',
+                title: 'VLSM (Variable Length)',
+                icon: '📊',
+                pages: [
+                    {
+                        title: 'What is VLSM?',
+                        content: `<p class="text-gray-300 mb-4">Variable Length Subnet Masking allows you to use different subnet masks for different subnets, maximizing address efficiency.</p>
+                        <div class="bg-zinc-800 p-4 text-sm">
+                            <div class="text-yellow-400 mb-2">Traditional (fixed) subnetting:</div>
+                            <div class="text-gray-400">All subnets same size, wastes addresses</div>
+                            <div class="text-yellow-400 mt-4 mb-2">VLSM:</div>
+                            <div class="text-gray-300">Subnets sized to actual need</div>
+                        </div>`
+                    },
+                    {
+                        title: 'VLSM Process',
+                        content: `<p class="text-gray-300 mb-4">Steps to implement VLSM:</p>
+                        <ol class="space-y-2 text-gray-300 text-sm">
+                            <li class="flex"><span class="text-cyan-400 mr-2">1.</span>List all subnet requirements</li>
+                            <li class="flex"><span class="text-cyan-400 mr-2">2.</span>Sort by size (largest first)</li>
+                            <li class="flex"><span class="text-cyan-400 mr-2">3.</span>Allocate largest subnet first</li>
+                            <li class="flex"><span class="text-cyan-400 mr-2">4.</span>Use remaining space for smaller subnets</li>
+                            <li class="flex"><span class="text-cyan-400 mr-2">5.</span>Repeat until all subnets allocated</li>
+                        </ol>
+                        <div class="bg-zinc-800 p-3 mt-4 text-yellow-400 text-sm">
+                            ⚠️ Always allocate from largest to smallest!
+                        </div>`
+                    },
+                    {
+                        title: 'VLSM Example',
+                        content: `<p class="text-gray-300 mb-4">Given 192.168.1.0/24, create subnets for: 50, 25, 10, 2 hosts</p>
+                        <div class="space-y-2 text-sm">
+                            <div class="bg-zinc-800 p-2">
+                                <span class="text-cyan-400">50 hosts →</span>
+                                <span class="text-gray-300">192.168.1.0/26 (62 usable)</span>
+                            </div>
+                            <div class="bg-zinc-800 p-2">
+                                <span class="text-green-400">25 hosts →</span>
+                                <span class="text-gray-300">192.168.1.64/27 (30 usable)</span>
+                            </div>
+                            <div class="bg-zinc-800 p-2">
+                                <span class="text-yellow-400">10 hosts →</span>
+                                <span class="text-gray-300">192.168.1.96/28 (14 usable)</span>
+                            </div>
+                            <div class="bg-zinc-800 p-2">
+                                <span class="text-purple-400">2 hosts →</span>
+                                <span class="text-gray-300">192.168.1.112/30 (2 usable)</span>
+                            </div>
+                        </div>`
+                    }
+                ]
+            },
+            {
+                id: 'osi_model',
+                title: 'OSI Model',
+                icon: '📚',
+                pages: [
+                    {
+                        title: 'The 7 Layers',
+                        content: `<p class="text-gray-300 mb-4">The OSI (Open Systems Interconnection) model has 7 layers:</p>
+                        <div class="space-y-1 text-sm">
+                            <div class="bg-purple-900/30 border-l-4 border-purple-500 p-2 flex justify-between">
+                                <span class="text-purple-400">7. Application</span><span class="text-gray-500">HTTP, FTP, SMTP</span>
+                            </div>
+                            <div class="bg-pink-900/30 border-l-4 border-pink-500 p-2 flex justify-between">
+                                <span class="text-pink-400">6. Presentation</span><span class="text-gray-500">SSL, JPEG, ASCII</span>
+                            </div>
+                            <div class="bg-red-900/30 border-l-4 border-red-500 p-2 flex justify-between">
+                                <span class="text-red-400">5. Session</span><span class="text-gray-500">NetBIOS, RPC</span>
+                            </div>
+                            <div class="bg-yellow-900/30 border-l-4 border-yellow-500 p-2 flex justify-between">
+                                <span class="text-yellow-400">4. Transport</span><span class="text-gray-500">TCP, UDP</span>
+                            </div>
+                            <div class="bg-green-900/30 border-l-4 border-green-500 p-2 flex justify-between">
+                                <span class="text-green-400">3. Network</span><span class="text-gray-500">IP, ICMP, ARP</span>
+                            </div>
+                            <div class="bg-cyan-900/30 border-l-4 border-cyan-500 p-2 flex justify-between">
+                                <span class="text-cyan-400">2. Data Link</span><span class="text-gray-500">Ethernet, MAC</span>
+                            </div>
+                            <div class="bg-blue-900/30 border-l-4 border-blue-500 p-2 flex justify-between">
+                                <span class="text-blue-400">1. Physical</span><span class="text-gray-500">Cables, Hubs</span>
+                            </div>
+                        </div>`
+                    },
+                    {
+                        title: 'Layer Mnemonics',
+                        content: `<p class="text-gray-300 mb-4">Memory aids for the OSI layers:</p>
+                        <div class="space-y-4">
+                            <div class="bg-zinc-800 p-4">
+                                <div class="text-cyan-400 font-bold mb-2">Top to Bottom (7→1)</div>
+                                <div class="text-gray-300">"<span class="text-yellow-400">A</span>ll <span class="text-yellow-400">P</span>eople <span class="text-yellow-400">S</span>eem <span class="text-yellow-400">T</span>o <span class="text-yellow-400">N</span>eed <span class="text-yellow-400">D</span>ata <span class="text-yellow-400">P</span>rocessing"</div>
+                            </div>
+                            <div class="bg-zinc-800 p-4">
+                                <div class="text-cyan-400 font-bold mb-2">Bottom to Top (1→7)</div>
+                                <div class="text-gray-300">"<span class="text-yellow-400">P</span>lease <span class="text-yellow-400">D</span>o <span class="text-yellow-400">N</span>ot <span class="text-yellow-400">T</span>hrow <span class="text-yellow-400">S</span>ausage <span class="text-yellow-400">P</span>izza <span class="text-yellow-400">A</span>way"</div>
+                            </div>
+                        </div>`
+                    },
+                    {
+                        title: 'PDU Names',
+                        content: `<p class="text-gray-300 mb-4">Each layer has its own Protocol Data Unit (PDU) name:</p>
+                        <table class="w-full text-sm">
+                            <tr class="border-b border-zinc-700">
+                                <td class="py-2 text-gray-500">Layer 7-5</td>
+                                <td class="py-2 text-cyan-400">Data</td>
+                            </tr>
+                            <tr class="border-b border-zinc-700">
+                                <td class="py-2 text-gray-500">Layer 4</td>
+                                <td class="py-2 text-cyan-400">Segment (TCP) / Datagram (UDP)</td>
+                            </tr>
+                            <tr class="border-b border-zinc-700">
+                                <td class="py-2 text-gray-500">Layer 3</td>
+                                <td class="py-2 text-cyan-400">Packet</td>
+                            </tr>
+                            <tr class="border-b border-zinc-700">
+                                <td class="py-2 text-gray-500">Layer 2</td>
+                                <td class="py-2 text-cyan-400">Frame</td>
+                            </tr>
+                            <tr>
+                                <td class="py-2 text-gray-500">Layer 1</td>
+                                <td class="py-2 text-cyan-400">Bits</td>
+                            </tr>
+                        </table>`
+                    }
+                ]
             }
-            renderSettingsList();
-        }
+        ];
 
-        function saveSettings() {
-            const settingsMap = {};
-            questionRegistry.forEach(item => settingsMap[item.id] = item.enabled);
-            localStorage.setItem('ipDrillSettings', JSON.stringify(settingsMap));
-        }
+        let currentLearnModule = null;
+        let currentLearnPage = 0;
 
-        function renderSettingsList() {
-            const list = document.getElementById('settings-list');
-            list.innerHTML = '';
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        function init() {
+            loadStats();
+            renderSettingsCategories();
+            renderSubnetTable();
+            renderLearnModules();
+            updateStatsDisplay();
+            updateBestScores();
+            convertDecToBin();
+            showIpBinary();
+            generateQuestion();
             
-            questionRegistry.forEach(item => {
-                const div = document.createElement('div');
-                div.className = "flex items-center justify-between p-2 hover:bg-zinc-800/50 border border-transparent hover:border-zinc-700 transition-colors cursor-pointer";
-                div.onclick = (e) => {
-                    // Toggle checkbox if clicking the row
-                    if (e.target.type !== 'checkbox') {
-                        const cb = div.querySelector('input');
-                        cb.checked = !cb.checked;
-                        updateSetting(item.id, cb.checked);
-                    }
-                };
-
-                div.innerHTML = `
-                    <span class="text-gray-300 text-sm font-mono">${item.label}</span>
-                    <input type="checkbox" 
-                        class="w-5 h-5 accent-cyan-500 cursor-pointer" 
-                        ${item.enabled ? 'checked' : ''} 
-                        onclick="event.stopPropagation(); updateSetting('${item.id}', this.checked)">
-                `;
-                list.appendChild(div);
+            document.getElementById('input-field').addEventListener('keydown', handleInput);
+            document.getElementById('challenge-input').addEventListener('keydown', handleChallengeInput);
+            document.addEventListener('keydown', handleGlobalKeys);
+            
+            // Set initial difficulty button state
+            document.querySelectorAll('.diff-btn').forEach(btn => {
+                if(btn.dataset.diff === difficulty) {
+                    btn.classList.add('bg-opacity-20');
+                }
             });
         }
 
-        function updateSetting(id, isChecked) {
-            const item = questionRegistry.find(i => i.id === id);
-            if (item) item.enabled = isChecked;
-            saveSettings();
-        }
-
-        function toggleSettings() {
-            const modal = document.getElementById('settings-modal');
-            const isHidden = modal.classList.contains('hidden');
+        function loadStats() {
+            const saved = localStorage.getItem('netdrill_stats');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                stats = { ...stats, ...parsed };
+            }
             
-            if (isHidden) {
-                modal.classList.remove('hidden');
-                document.getElementById('main-ui').classList.add('blur-sm');
-            } else {
-                // Ensure at least one is enabled
-                if (!questionRegistry.some(q => q.enabled)) {
-                    alert("You must enable at least one question type.");
-                    questionRegistry[0].enabled = true;
-                    renderSettingsList();
-                    return;
-                }
-                modal.classList.add('hidden');
-                document.getElementById('main-ui').classList.remove('blur-sm');
-                inputField.focus();
-                nextQuestion(); // Refresh question based on new settings
+            const savedDiff = localStorage.getItem('netdrill_difficulty');
+            if (savedDiff) difficulty = savedDiff;
+            
+            const savedCategories = localStorage.getItem('netdrill_categories');
+            if (savedCategories) {
+                const cats = JSON.parse(savedCategories);
+                questionRegistry.forEach(q => {
+                    if (cats[q.id] !== undefined) q.enabled = cats[q.id];
+                });
             }
         }
 
-        // --- Game Logic ---
-        function nextQuestion() {
-            // Filter enabled generators
-            const available = questionRegistry.filter(q => q.enabled);
-            if (available.length === 0) return; // Should be caught by toggleSettings
-
-            const gen = available[rand(0, available.length - 1)];
-            currentQuestion = gen.fn();
+        function saveStats() {
+            localStorage.setItem('netdrill_stats', JSON.stringify(stats));
+            localStorage.setItem('netdrill_difficulty', difficulty);
             
-            const qContainer = document.getElementById('question-container');
-            qContainer.classList.remove('fade-in');
-            void qContainer.offsetWidth; 
-            qContainer.classList.add('fade-in');
+            const cats = {};
+            questionRegistry.forEach(q => cats[q.id] = q.enabled);
+            localStorage.setItem('netdrill_categories', JSON.stringify(cats));
+        }
 
-            document.getElementById('question-text').innerText = currentQuestion.q;
-            inputField.value = '';
-            feedbackDiv.style.opacity = '0';
-            solutionDiv.style.opacity = '0';
-            inputField.focus();
+        // ============================================
+        // QUESTION GENERATION
+        // ============================================
+        function generateQuestion() {
+            const eligible = questionRegistry.filter(q => 
+                q.enabled && q.difficulty.includes(difficulty)
+            );
+            
+            if (eligible.length === 0) {
+                document.getElementById('question-text').textContent = "No questions available. Enable more categories in settings.";
+                return;
+            }
+            
+            const selected = eligible[rand(0, eligible.length - 1)];
+            currentQuestion = { ...selected.fn(difficulty), type: selected.id, category: selected.category };
+            questionNumber++;
+            
+            document.getElementById('question-number').textContent = questionNumber;
+            document.getElementById('question-text').textContent = currentQuestion.q;
+            document.getElementById('question-hint').classList.add('hidden');
+            document.getElementById('question-hint').textContent = '';
+            document.getElementById('category-badge').textContent = currentQuestion.category;
+            
+            // Update difficulty badge
+            const diffBadge = document.getElementById('difficulty-badge');
+            diffBadge.textContent = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+            diffBadge.className = `text-xs px-3 py-1 border text-gray-400 uppercase tracking-wider difficulty-${difficulty}`;
+            
+            // Reset UI
+            document.getElementById('input-field').value = '';
+            document.getElementById('input-field').disabled = false;
+            document.getElementById('input-field').focus();
+            document.getElementById('feedback').classList.add('opacity-0');
+            document.getElementById('solution').classList.add('opacity-0');
+            document.getElementById('next-btn').classList.add('hidden');
+            document.getElementById('question-container').classList.add('fade-in');
+            
+            isBookmarked = stats.bookmarks.includes(currentQuestion.q);
+            updateBookmarkBtn();
+            
+            setTimeout(() => {
+                document.getElementById('question-container').classList.remove('fade-in');
+            }, 300);
+        }
+
+        function handleInput(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                checkAnswer();
+            }
         }
 
         function checkAnswer() {
-            const userVal = inputField.value.trim().toLowerCase();
-            const cleanUser = userVal.replace(/[\/\s]/g, ''); 
-            const cleanAns = currentQuestion.a.toLowerCase().replace(/[\/\s]/g, '');
+            const input = document.getElementById('input-field');
+            let userAnswer = input.value.trim().toLowerCase();
             
-            // Math Eval
-            let calculatedVal = null;
+            if (!userAnswer) return;
+            
+            // Allow math expressions
             try {
-                let sanitized = userVal.replace(/\^/g, '**');
-                if (/^[0-9+\-*/().\s]+$/.test(sanitized) || sanitized.includes('**')) {
-                    calculatedVal = new Function('return ' + sanitized)();
+                if (/^[\d\s\+\-\*\/\(\)\^]+$/.test(userAnswer)) {
+                    userAnswer = eval(userAnswer.replace('^', '**')).toString();
                 }
             } catch (e) {}
-
-            let isCorrect = (calculatedVal !== null && calculatedVal.toString() === cleanAns) || 
-                            (cleanUser === cleanAns) || 
-                            (userVal === currentQuestion.a.toLowerCase());
-
+            
+            const correctAnswer = currentQuestion.a.toLowerCase();
+            const altAnswers = (currentQuestion.alt || []).map(a => a.toLowerCase());
+            
+            const isCorrect = userAnswer === correctAnswer || 
+                             altAnswers.includes(userAnswer) ||
+                             userAnswer === correctAnswer.replace('/', '') ||
+                             ('/' + userAnswer) === correctAnswer;
+            
+            stats.total++;
+            
             if (isCorrect) {
-                feedbackText.innerText = "ADEQUATE";
-                feedbackText.className = "text-green-500 font-bold tracking-widest uppercase text-sm";
-                feedbackDiv.style.opacity = '1';
-                setTimeout(nextQuestion, 800); 
+                handleCorrect();
             } else {
-                document.body.classList.add('shake');
-                feedbackText.innerText = insults[rand(0, insults.length - 1)];
-                feedbackText.className = "text-[#ff0044] font-bold tracking-widest uppercase text-sm";
-                feedbackDiv.style.opacity = '1';
-                
-                document.getElementById('solution-text').innerText = `ANSWER: ${currentQuestion.a}`;
-                document.getElementById('explanation-text').innerText = currentQuestion.e;
-                solutionDiv.style.opacity = '1';
-                setTimeout(() => document.body.classList.remove('shake'), 500);
+                handleWrong();
+            }
+            
+            // Record history
+            stats.history.unshift({
+                q: currentQuestion.q,
+                a: currentQuestion.a,
+                user: input.value,
+                correct: isCorrect,
+                time: Date.now()
+            });
+            if (stats.history.length > 50) stats.history.pop();
+            
+            // Update category stats
+            if (!stats.categoryStats[currentQuestion.category]) {
+                stats.categoryStats[currentQuestion.category] = { correct: 0, total: 0 };
+            }
+            stats.categoryStats[currentQuestion.category].total++;
+            if (isCorrect) stats.categoryStats[currentQuestion.category].correct++;
+            
+            checkAchievements();
+            updateStatsDisplay();
+            saveStats();
+        }
+
+        function handleCorrect() {
+            streak++;
+            stats.correct++;
+            stats.streak = streak;
+            if (streak > stats.bestStreak) {
+                stats.bestStreak = streak;
+            }
+            
+            // XP calculation
+            const baseXp = XP_REWARDS[difficulty] || 5;
+            const streakBonus = Math.min(streak, 10);
+            const xpGained = baseXp + streakBonus;
+            stats.xp += xpGained;
+            
+            // Level up check
+            const newLevel = Math.floor(stats.xp / XP_PER_LEVEL) + 1;
+            if (newLevel > stats.level) {
+                stats.level = newLevel;
+                showLevelUp(newLevel);
+            }
+            
+            document.getElementById('feedback-text').textContent = praises[rand(0, praises.length - 1)];
+            document.getElementById('feedback-text').className = 'text-green-500 font-bold tracking-widest uppercase text-sm';
+            document.getElementById('xp-gained').textContent = `+${xpGained} XP`;
+            document.getElementById('xp-gained').classList.remove('hidden');
+            document.getElementById('feedback').classList.remove('opacity-0');
+            
+            document.getElementById('input-field').classList.add('shake');
+            setTimeout(() => document.getElementById('input-field').classList.remove('shake'), 500);
+            
+            if (streak >= 5) {
+                document.getElementById('streak-fire-icon').classList.remove('hidden');
+                document.getElementById('streak-display').classList.add('streak-fire');
+                setTimeout(() => document.getElementById('streak-display').classList.remove('streak-fire'), 500);
+            }
+            
+            // Auto advance
+            if (document.getElementById('opt-auto').checked) {
+                setTimeout(() => {
+                    generateQuestion();
+                }, 800);
+            } else {
+                document.getElementById('next-btn').classList.remove('hidden');
+                document.getElementById('solution').classList.remove('opacity-0');
             }
         }
 
-        // --- Init ---
-        loadSettings();
-        nextQuestion();
-
-        inputField.addEventListener('keydown', (e) => {
-            if (!document.getElementById('settings-modal').classList.contains('hidden')) return;
+        function handleWrong() {
+            streak = 0;
+            stats.streak = 0;
             
+            document.getElementById('feedback-text').textContent = insults[rand(0, insults.length - 1)];
+            document.getElementById('feedback-text').className = 'text-red-500 font-bold tracking-widest uppercase text-sm';
+            document.getElementById('xp-gained').classList.add('hidden');
+            document.getElementById('feedback').classList.remove('opacity-0');
+            
+            document.getElementById('input-field').classList.add('shake');
+            setTimeout(() => document.getElementById('input-field').classList.remove('shake'), 500);
+            
+            document.getElementById('streak-fire-icon').classList.add('hidden');
+            
+            // Show solution
+            document.getElementById('solution-text').textContent = `ANSWER: ${currentQuestion.a}`;
+            document.getElementById('explanation-text').textContent = currentQuestion.e || '';
+            document.getElementById('solution').classList.remove('opacity-0');
+            document.getElementById('next-btn').classList.remove('hidden');
+            
+            document.getElementById('input-field').disabled = true;
+        }
+
+        function showHint() {
+            if (currentQuestion.hint) {
+                document.getElementById('question-hint').textContent = `💡 ${currentQuestion.hint}`;
+                document.getElementById('question-hint').classList.remove('hidden');
+            }
+        }
+
+        function skipQuestion() {
+            streak = 0;
+            stats.streak = 0;
+            document.getElementById('streak-fire-icon').classList.add('hidden');
+            generateQuestion();
+        }
+
+        function toggleBookmark() {
+            const q = currentQuestion.q;
+            if (stats.bookmarks.includes(q)) {
+                stats.bookmarks = stats.bookmarks.filter(b => b !== q);
+                isBookmarked = false;
+            } else {
+                stats.bookmarks.push(q);
+                isBookmarked = true;
+            }
+            updateBookmarkBtn();
+            saveStats();
+        }
+
+        function updateBookmarkBtn() {
+            const btn = document.getElementById('bookmark-btn');
+            if (isBookmarked) {
+                btn.textContent = '[B] Bookmarked ★';
+                btn.classList.add('text-yellow-500');
+            } else {
+                btn.textContent = '[B] Bookmark';
+                btn.classList.remove('text-yellow-500');
+            }
+        }
+
+        // ============================================
+        // MODE SWITCHING
+        // ============================================
+        function setMode(mode) {
+            currentMode = mode;
+            
+            // Hide all modes
+            document.getElementById('drill-mode').classList.add('hidden');
+            document.getElementById('learn-mode').classList.add('hidden');
+            document.getElementById('challenge-mode').classList.add('hidden');
+            document.getElementById('tools-mode').classList.add('hidden');
+            
+            // Show selected mode
+            document.getElementById(`${mode}-mode`).classList.remove('hidden');
+            
+            // Update tabs
+            document.querySelectorAll('[id^="mode-"]').forEach(btn => {
+                btn.classList.remove('tab-active');
+            });
+            document.getElementById(`mode-${mode}`).classList.add('tab-active');
+            
+            // Mobile tabs
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('text-cyan-400', 'border-b-2', 'border-cyan-400');
+                if (btn.dataset.mode === mode) {
+                    btn.classList.add('text-cyan-400', 'border-b-2', 'border-cyan-400');
+                }
+            });
+            
+            if (mode === 'drill') {
+                document.getElementById('input-field').focus();
+            }
+        }
+
+        // ============================================
+        // CHALLENGE MODE
+        // ============================================
+        function startChallenge(type) {
+            challengeType = type;
+            challengeActive = true;
+            challengeScore = 0;
+            challengeLives = 3;
+            
+            document.getElementById('challenge-select').classList.add('hidden');
+            document.getElementById('challenge-results').classList.add('hidden');
+            document.getElementById('challenge-active').classList.remove('hidden');
+            
+            const typeNames = { speed: 'Speed Run', survival: 'Survival', timed: 'Time Attack' };
+            document.getElementById('challenge-type-display').textContent = typeNames[type];
+            
+            if (type === 'survival') {
+                document.getElementById('lives-display').classList.remove('hidden');
+                updateLivesDisplay();
+            } else {
+                document.getElementById('lives-display').classList.add('hidden');
+            }
+            
+            if (type === 'speed') {
+                document.getElementById('challenge-stat-1').textContent = '0/20';
+                challengeStartTime = Date.now();
+                startChallengeTimer();
+            } else if (type === 'timed') {
+                document.getElementById('challenge-stat-1').textContent = '0';
+                document.getElementById('challenge-stat-2').textContent = '60s';
+                challengeStartTime = Date.now();
+                startCountdownTimer(60);
+            } else {
+                document.getElementById('challenge-stat-1').textContent = '0';
+                document.getElementById('challenge-stat-2').textContent = '3 lives';
+            }
+            
+            generateChallengeQuestion();
+            document.getElementById('challenge-input').focus();
+        }
+
+        function generateChallengeQuestion() {
+            const eligible = questionRegistry.filter(q => 
+                q.enabled && q.difficulty.includes(difficulty)
+            );
+            
+            if (eligible.length === 0) return;
+            
+            const selected = eligible[rand(0, eligible.length - 1)];
+            currentQuestion = { ...selected.fn(difficulty), type: selected.id };
+            
+            document.getElementById('challenge-question').textContent = currentQuestion.q;
+            document.getElementById('challenge-input').value = '';
+        }
+
+        function handleChallengeInput(e) {
             if (e.key === 'Enter') {
-                if(inputField.value === '') return;
-                checkAnswer();
+                e.preventDefault();
+                checkChallengeAnswer();
             }
+        }
+
+        function checkChallengeAnswer() {
+            const input = document.getElementById('challenge-input');
+            let userAnswer = input.value.trim().toLowerCase();
+            
+            if (!userAnswer) return;
+            
+            try {
+                if (/^[\d\s\+\-\*\/\(\)\^]+$/.test(userAnswer)) {
+                    userAnswer = eval(userAnswer.replace('^', '**')).toString();
+                }
+            } catch (e) {}
+            
+            const correctAnswer = currentQuestion.a.toLowerCase();
+            const altAnswers = (currentQuestion.alt || []).map(a => a.toLowerCase());
+            
+            const isCorrect = userAnswer === correctAnswer || 
+                             altAnswers.includes(userAnswer) ||
+                             userAnswer === correctAnswer.replace('/', '') ||
+                             ('/' + userAnswer) === correctAnswer;
+            
+            if (isCorrect) {
+                challengeScore++;
+                
+                if (challengeType === 'speed') {
+                    document.getElementById('challenge-stat-1').textContent = `${challengeScore}/20`;
+                    if (challengeScore >= 20) {
+                        endChallenge(true);
+                        return;
+                    }
+                } else if (challengeType === 'survival') {
+                    document.getElementById('challenge-stat-1').textContent = challengeScore;
+                } else if (challengeType === 'timed') {
+                    document.getElementById('challenge-stat-1').textContent = challengeScore;
+                }
+                
+                input.style.color = '#22c55e';
+                setTimeout(() => input.style.color = 'white', 200);
+            } else {
+                if (challengeType === 'survival') {
+                    challengeLives--;
+                    updateLivesDisplay();
+                    if (challengeLives <= 0) {
+                        endChallenge(true);
+                        return;
+                    }
+                }
+                
+                input.style.color = '#ef4444';
+                input.classList.add('shake');
+                setTimeout(() => {
+                    input.style.color = 'white';
+                    input.classList.remove('shake');
+                }, 500);
+            }
+            
+            generateChallengeQuestion();
+        }
+
+        function updateLivesDisplay() {
+            const hearts = document.querySelectorAll('#lives-display .life');
+            hearts.forEach((h, i) => {
+                h.textContent = i < challengeLives ? '❤️' : '🖤';
+            });
+            document.getElementById('challenge-stat-2').textContent = `${challengeLives} lives`;
+        }
+
+        function startChallengeTimer() {
+            challengeTimer = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - challengeStartTime) / 1000);
+                const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                const secs = (elapsed % 60).toString().padStart(2, '0');
+                document.getElementById('challenge-stat-2').textContent = `${mins}:${secs}`;
+            }, 100);
+        }
+
+        function startCountdownTimer(seconds) {
+            let remaining = seconds;
+            document.getElementById('challenge-stat-2').textContent = `${remaining}s`;
+            
+            challengeTimer = setInterval(() => {
+                remaining--;
+                document.getElementById('challenge-stat-2').textContent = `${remaining}s`;
+                
+                if (remaining <= 0) {
+                    endChallenge(true);
+                }
+            }, 1000);
+        }
+
+        function endChallenge(completed = false) {
+            challengeActive = false;
+            if (challengeTimer) {
+                clearInterval(challengeTimer);
+                challengeTimer = null;
+            }
+            
+            document.getElementById('challenge-active').classList.add('hidden');
+            document.getElementById('challenge-results').classList.remove('hidden');
+            
+            let resultText = '';
+            let isNewRecord = false;
+            
+            if (challengeType === 'speed' && completed) {
+                const time = (Date.now() - challengeStartTime) / 1000;
+                resultText = `Time: ${time.toFixed(2)} seconds`;
+                if (!stats.challengeBests.speed || time < stats.challengeBests.speed) {
+                    stats.challengeBests.speed = time;
+                    isNewRecord = true;
+                }
+            } else if (challengeType === 'survival') {
+                resultText = `Score: ${challengeScore}`;
+                if (challengeScore > stats.challengeBests.survival) {
+                    stats.challengeBests.survival = challengeScore;
+                    isNewRecord = true;
+                }
+            } else if (challengeType === 'timed') {
+                resultText = `Questions Answered: ${challengeScore}`;
+                if (challengeScore > stats.challengeBests.timed) {
+                    stats.challengeBests.timed = challengeScore;
+                    isNewRecord = true;
+                }
+            }
+            
+            document.getElementById('challenge-final-stats').textContent = resultText;
+            document.getElementById('challenge-new-record').classList.toggle('hidden', !isNewRecord);
+            
+            updateBestScores();
+            checkAchievements();
+            saveStats();
+        }
+
+        function resetChallenge() {
+            document.getElementById('challenge-results').classList.add('hidden');
+            document.getElementById('challenge-select').classList.remove('hidden');
+        }
+
+        function updateBestScores() {
+            if (stats.challengeBests.speed) {
+                document.getElementById('best-speed').textContent = stats.challengeBests.speed.toFixed(2) + 's';
+            }
+            document.getElementById('best-survival').textContent = stats.challengeBests.survival;
+            document.getElementById('best-timed').textContent = stats.challengeBests.timed;
+        }
+
+        // ============================================
+        // TOOLS
+        // ============================================
+        function calculateSubnet() {
+            const ipInput = document.getElementById('calc-ip').value.trim();
+            const cidrInput = document.getElementById('calc-cidr').value.trim();
+            
+            let cidr;
+            if (cidrInput.startsWith('/')) {
+                cidr = parseInt(cidrInput.slice(1));
+            } else if (cidrInput.includes('.')) {
+                cidr = maskToCidr(cidrInput);
+            } else {
+                cidr = parseInt(cidrInput);
+            }
+            
+            if (isNaN(cidr) || cidr < 0 || cidr > 32) {
+                alert('Invalid CIDR/mask');
+                return;
+            }
+            
+            const netId = getNetworkId(ipInput, cidr);
+            const broadcast = getBroadcast(ipInput, cidr);
+            const firstHost = intToIp(ipToInt(netId) + 1);
+            const lastHost = intToIp(ipToInt(broadcast) - 1);
+            const mask = cidrToMask(cidr);
+            const wildcard = mask.split('.').map(o => 255 - parseInt(o)).join('.');
+            const hosts = Math.pow(2, 32 - cidr) - 2;
+            const ipClass = getIpClass(ipInput);
+            const ipType = isPrivate(ipInput) ? 'Private' : 'Public';
+            
+            document.getElementById('calc-network').textContent = netId;
+            document.getElementById('calc-broadcast').textContent = broadcast;
+            document.getElementById('calc-first').textContent = firstHost;
+            document.getElementById('calc-last').textContent = lastHost;
+            document.getElementById('calc-mask').textContent = mask;
+            document.getElementById('calc-wildcard').textContent = wildcard;
+            document.getElementById('calc-hosts').textContent = hosts.toLocaleString();
+            document.getElementById('calc-class').textContent = ipClass;
+            document.getElementById('calc-type').textContent = ipType;
+            
+            document.getElementById('calc-results').classList.remove('hidden');
+        }
+
+        function convertDecToBin() {
+            const dec = parseInt(document.getElementById('conv-decimal').value) || 0;
+            const clamped = Math.max(0, Math.min(255, dec));
+            const bin = decToBin(clamped);
+            document.getElementById('conv-binary').value = bin;
+            updateBitDisplay(bin);
+        }
+
+        function convertBinToDec() {
+            let bin = document.getElementById('conv-binary').value.replace(/[^01]/g, '');
+            bin = bin.slice(0, 8).padStart(8, '0');
+            const dec = binToDec(bin);
+            document.getElementById('conv-decimal').value = dec;
+            updateBitDisplay(bin);
+        }
+
+        function updateBitDisplay(bin) {
+            const container = document.getElementById('bit-display');
+            container.innerHTML = '';
+            for (let i = 0; i < 8; i++) {
+                const bit = bin[i] || '0';
+                const div = document.createElement('div');
+                div.className = `py-1 rounded ${bit === '1' ? 'bg-cyan-500 text-black font-bold' : 'bg-zinc-800 text-gray-500'}`;
+                div.textContent = bit;
+                container.appendChild(div);
+            }
+        }
+
+        function showIpBinary() {
+            const ip = document.getElementById('ip-bin-input').value.trim();
+            const container = document.getElementById('ip-binary-output');
+            container.innerHTML = '';
+            
+            const octets = ip.split('.');
+            if (octets.length !== 4) return;
+            
+            octets.forEach((octet, i) => {
+                const num = parseInt(octet) || 0;
+                const bin = decToBin(Math.max(0, Math.min(255, num)));
+                const div = document.createElement('div');
+                div.className = 'flex justify-between bg-zinc-800 p-2 rounded';
+                div.innerHTML = `<span class="text-gray-500">${num.toString().padStart(3, ' ')}</span><span class="text-cyan-400">${bin}</span>`;
+                container.appendChild(div);
+            });
+        }
+
+        function calculateVLSM() {
+            const network = document.getElementById('vlsm-network').value.trim();
+            const hostsInput = document.getElementById('vlsm-hosts').value.trim();
+            
+            const [netIp, netCidr] = network.split('/');
+            const baseCidr = parseInt(netCidr);
+            const totalAddresses = Math.pow(2, 32 - baseCidr);
+            
+            let hosts = hostsInput.split(',').map(h => parseInt(h.trim())).filter(h => !isNaN(h));
+            hosts.sort((a, b) => b - a);
+            
+            const results = [];
+            let currentIp = ipToInt(getNetworkId(netIp, baseCidr));
+            let usedAddresses = 0;
+            
+            for (const needed of hosts) {
+                const requiredAddresses = needed + 2;
+                const hostBits = Math.ceil(Math.log2(requiredAddresses));
+                const cidr = 32 - hostBits;
+                const blockSize = Math.pow(2, hostBits);
+                
+                if (usedAddresses + blockSize > totalAddresses) {
+                    results.push({
+                        hosts: needed,
+                        error: 'Insufficient space'
+                    });
+                    continue;
+                }
+                
+                const subnetIp = intToIp(currentIp);
+                const broadcast = intToIp(currentIp + blockSize - 1);
+                const usable = blockSize - 2;
+                
+                results.push({
+                    hosts: needed,
+                    network: `${subnetIp}/${cidr}`,
+                    range: `${intToIp(currentIp + 1)} - ${intToIp(currentIp + blockSize - 2)}`,
+                    broadcast: broadcast,
+                    usable: usable
+                });
+                
+                currentIp += blockSize;
+                usedAddresses += blockSize;
+            }
+            
+            const container = document.getElementById('vlsm-results');
+            container.innerHTML = '';
+            
+            results.forEach((r, i) => {
+                const div = document.createElement('div');
+                div.className = 'bg-zinc-800 p-3';
+                if (r.error) {
+                    div.innerHTML = `<span class="text-red-400">Subnet ${i + 1} (${r.hosts} hosts): ${r.error}</span>`;
+                } else {
+                    div.innerHTML = `
+                        <div class="text-cyan-400 font-bold">Subnet ${i + 1}: ${r.hosts} hosts needed</div>
+                        <div class="text-sm mt-1 space-y-1">
+                            <div><span class="text-gray-500">Network:</span> <span class="text-white">${r.network}</span></div>
+                            <div><span class="text-gray-500">Usable:</span> <span class="text-white">${r.range}</span></div>
+                            <div><span class="text-gray-500">Broadcast:</span> <span class="text-white">${r.broadcast}</span></div>
+                            <div><span class="text-gray-500">Capacity:</span> <span class="text-green-400">${r.usable} hosts</span></div>
+                        </div>
+                    `;
+                }
+                container.appendChild(div);
+            });
+            
+            container.classList.remove('hidden');
+        }
+
+        // ============================================
+        // SETTINGS
+        // ============================================
+        function toggleSettings() {
+            const modal = document.getElementById('settings-modal');
+            modal.classList.toggle('hidden');
+            if (!modal.classList.contains('hidden')) {
+                renderSettingsCategories();
+            }
+        }
+
+        function renderSettingsCategories() {
+            const container = document.getElementById('settings-list');
+            container.innerHTML = '';
+            
+            const categories = {};
+            questionRegistry.forEach(q => {
+                if (!categories[q.category]) categories[q.category] = [];
+                categories[q.category].push(q);
+            });
+            
+            for (const [cat, questions] of Object.entries(categories)) {
+                const catDiv = document.createElement('div');
+                catDiv.className = 'mb-4';
+                catDiv.innerHTML = `<div class="text-gray-500 text-xs uppercase mb-2">${cat}</div>`;
+                
+                questions.forEach(q => {
+                    const label = document.createElement('label');
+                    label.className = 'flex items-center justify-between p-2 hover:bg-zinc-800/50 cursor-pointer';
+                    label.innerHTML = `
+                        <span class="text-gray-300 text-sm">${q.label}</span>
+                        <input type="checkbox" ${q.enabled ? 'checked' : ''} 
+                               onchange="toggleCategory('${q.id}')" 
+                               class="w-5 h-5 accent-cyan-500">
+                    `;
+                    catDiv.appendChild(label);
+                });
+                
+                container.appendChild(catDiv);
+            }
+        }
+
+        function toggleCategory(id) {
+            const q = questionRegistry.find(q => q.id === id);
+            if (q) q.enabled = !q.enabled;
+            saveStats();
+        }
+
+        function selectAllCategories(enabled) {
+            questionRegistry.forEach(q => q.enabled = enabled);
+            renderSettingsCategories();
+            saveStats();
+        }
+
+        function setDifficulty(diff) {
+            difficulty = diff;
+            document.querySelectorAll('.diff-btn').forEach(btn => {
+                btn.classList.remove('bg-green-500', 'bg-yellow-500', 'bg-red-500', 'bg-purple-500', 'text-black');
+                if (btn.dataset.diff === diff) {
+                    const colors = { easy: 'bg-green-500', medium: 'bg-yellow-500', hard: 'bg-red-500', expert: 'bg-purple-500' };
+                    btn.classList.add(colors[diff], 'text-black');
+                }
+            });
+            saveStats();
+            generateQuestion();
+        }
+
+        function resetProgress() {
+            if (confirm('Are you sure you want to reset ALL progress? This cannot be undone.')) {
+                localStorage.removeItem('netdrill_stats');
+                localStorage.removeItem('netdrill_difficulty');
+                localStorage.removeItem('netdrill_categories');
+                location.reload();
+            }
+        }
+
+        // ============================================
+        // STATS
+        // ============================================
+        function toggleStats() {
+            const modal = document.getElementById('stats-modal');
+            modal.classList.toggle('hidden');
+            if (!modal.classList.contains('hidden')) {
+                renderStats();
+            }
+        }
+
+        function renderStats() {
+            document.getElementById('stat-total').textContent = stats.total;
+            document.getElementById('stat-correct').textContent = stats.correct;
+            document.getElementById('stat-streak').textContent = stats.bestStreak;
+            document.getElementById('stat-xp').textContent = stats.xp;
+            
+            document.getElementById('stat-level').textContent = stats.level;
+            const currentLevelXp = stats.xp % XP_PER_LEVEL;
+            document.getElementById('stat-xp-current').textContent = currentLevelXp;
+            document.getElementById('stat-xp-needed').textContent = XP_PER_LEVEL;
+            document.getElementById('stat-level-bar').style.width = `${(currentLevelXp / XP_PER_LEVEL) * 100}%`;
+            
+            // Category stats
+            const catContainer = document.getElementById('category-stats');
+            catContainer.innerHTML = '';
+            for (const [cat, data] of Object.entries(stats.categoryStats)) {
+                const pct = data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0;
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between p-2 bg-zinc-800/50';
+                div.innerHTML = `
+                    <span class="text-gray-300">${cat}</span>
+                    <div class="flex items-center space-x-3">
+                        <span class="text-gray-500 text-sm">${data.correct}/${data.total}</span>
+                        <div class="w-24 h-2 bg-zinc-700 rounded-full overflow-hidden">
+                            <div class="h-full bg-cyan-500" style="width: ${pct}%"></div>
+                        </div>
+                        <span class="text-cyan-400 text-sm w-12 text-right">${pct}%</span>
+                    </div>
+                `;
+                catContainer.appendChild(div);
+            }
+            
+            // Achievements
+            const achContainer = document.getElementById('achievements-grid');
+            achContainer.innerHTML = '';
+            achievementDefs.forEach(ach => {
+                const unlocked = stats.achievements.includes(ach.id);
+                const div = document.createElement('div');
+                div.className = `badge p-3 text-center border ${unlocked ? 'border-yellow-500 bg-yellow-500/10' : 'border-zinc-700 locked'}`;
+                div.innerHTML = `
+                    <div class="text-2xl mb-1">${ach.icon}</div>
+                    <div class="text-xs ${unlocked ? 'text-white' : 'text-gray-600'}">${ach.name}</div>
+                `;
+                div.title = ach.desc;
+                achContainer.appendChild(div);
+            });
+            
+            // History
+            const histContainer = document.getElementById('history-list');
+            histContainer.innerHTML = '';
+            stats.history.slice(0, 20).forEach(h => {
+                const div = document.createElement('div');
+                div.className = `flex items-center justify-between p-2 ${h.correct ? 'border-l-2 border-green-500' : 'border-l-2 border-red-500'}`;
+                div.innerHTML = `
+                    <span class="text-gray-400 truncate flex-1 mr-4">${h.q}</span>
+                    <span class="text-${h.correct ? 'green' : 'red'}-400">${h.correct ? '✓' : '✗'}</span>
+                `;
+                histContainer.appendChild(div);
+            });
+        }
+
+        function updateStatsDisplay() {
+            document.getElementById('streak-display').textContent = streak;
+            document.getElementById('best-streak-tooltip').textContent = stats.bestStreak;
+            
+            const accuracy = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
+            document.getElementById('accuracy-display').textContent = `${accuracy}%`;
+            
+            document.getElementById('xp-display').textContent = stats.xp;
+            
+            // XP bar
+            const currentLevelXp = stats.xp % XP_PER_LEVEL;
+            document.getElementById('xp-bar').style.width = `${(currentLevelXp / XP_PER_LEVEL) * 100}%`;
+        }
+
+        function exportStats() {
+            const data = JSON.stringify(stats, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'netdrill_stats.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ============================================
+        // ACHIEVEMENTS
+        // ============================================
+        function checkAchievements() {
+            achievementDefs.forEach(ach => {
+                if (!stats.achievements.includes(ach.id) && ach.condition()) {
+                    stats.achievements.push(ach.id);
+                    showAchievementPopup(ach);
+                }
+            });
+        }
+
+        function showAchievementPopup(ach) {
+            const popup = document.getElementById('achievement-popup');
+            document.getElementById('achievement-icon').textContent = ach.icon;
+            document.getElementById('achievement-name').textContent = ach.name;
+            
+            popup.classList.remove('hidden');
+            setTimeout(() => popup.classList.remove('translate-x-full'), 10);
+            
+            setTimeout(() => {
+                popup.classList.add('translate-x-full');
+                setTimeout(() => popup.classList.add('hidden'), 500);
+            }, 3000);
+        }
+
+        function showLevelUp(level) {
+            // Simple level up notification - could be enhanced
+            const popup = document.getElementById('achievement-popup');
+            document.getElementById('achievement-icon').textContent = '⬆️';
+            document.getElementById('achievement-name').textContent = `Level ${level}!`;
+            
+            popup.classList.remove('hidden');
+            setTimeout(() => popup.classList.remove('translate-x-full'), 10);
+            
+            setTimeout(() => {
+                popup.classList.add('translate-x-full');
+                setTimeout(() => popup.classList.add('hidden'), 500);
+            }, 2000);
+        }
+
+        // ============================================
+        // REFERENCE
+        // ============================================
+        function toggleReference() {
+            document.getElementById('reference-modal').classList.toggle('hidden');
+        }
+
+        function showRefTab(tab) {
+            document.querySelectorAll('.ref-tab').forEach(t => {
+                t.classList.remove('text-cyan-400', 'border-b-2', 'border-cyan-400');
+                t.classList.add('text-gray-500');
+            });
+            document.querySelector(`[data-tab="${tab}"]`).classList.add('text-cyan-400', 'border-b-2', 'border-cyan-400');
+            document.querySelector(`[data-tab="${tab}"]`).classList.remove('text-gray-500');
+            
+            document.querySelectorAll('.ref-content').forEach(c => c.classList.add('hidden'));
+            document.getElementById(`ref-${tab}`).classList.remove('hidden');
+        }
+
+        function renderSubnetTable() {
+            const tbody = document.getElementById('subnet-table-body');
+            tbody.innerHTML = '';
+            
+            for (let cidr = 32; cidr >= 8; cidr--) {
+                const mask = cidrToMask(cidr);
+                const wildcard = mask.split('.').map(o => 255 - parseInt(o)).join('.');
+                const total = Math.pow(2, 32 - cidr);
+                const usable = cidr >= 31 ? (cidr === 32 ? 1 : 2) : total - 2;
+                
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-zinc-800/50 hover:bg-zinc-800/30';
+                tr.innerHTML = `
+                    <td class="py-2 px-2 text-cyan-400">/${cidr}</td>
+                    <td class="py-2 px-2 text-gray-300">${mask}</td>
+                    <td class="py-2 px-2 text-gray-500">${wildcard}</td>
+                    <td class="py-2 px-2 text-gray-300">${total.toLocaleString()}</td>
+                    <td class="py-2 px-2 text-gray-300">${usable.toLocaleString()}</td>
+                `;
+                tbody.appendChild(tr);
+            }
+        }
+
+        // ============================================
+        // LEARN MODE
+        // ============================================
+        function renderLearnModules() {
+            const container = document.getElementById('learn-modules');
+            container.innerHTML = '';
+            
+            learnModules.forEach(mod => {
+                const div = document.createElement('div');
+                div.className = 'border border-zinc-800 p-6 hover:border-cyan-500 transition cursor-pointer group';
+                div.onclick = () => openLearnModule(mod.id);
+                div.innerHTML = `
+                    <div class="text-3xl mb-3">${mod.icon}</div>
+                    <h3 class="text-lg font-bold text-white group-hover:text-cyan-400 transition">${mod.title}</h3>
+                    <p class="text-gray-500 text-sm mt-2">${mod.pages.length} pages</p>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function openLearnModule(id) {
+            currentLearnModule = learnModules.find(m => m.id === id);
+            currentLearnPage = 0;
+            
+            document.getElementById('learn-modal').classList.remove('hidden');
+            renderLearnPage();
+        }
+
+        function renderLearnPage() {
+            if (!currentLearnModule) return;
+            
+            const page = currentLearnModule.pages[currentLearnPage];
+            document.getElementById('learn-modal-title').textContent = page.title;
+            document.getElementById('learn-modal-content').innerHTML = page.content;
+            document.getElementById('learn-page-indicator').textContent = `${currentLearnPage + 1} / ${currentLearnModule.pages.length}`;
+            
+            document.getElementById('learn-prev').disabled = currentLearnPage === 0;
+            document.getElementById('learn-prev').classList.toggle('opacity-30', currentLearnPage === 0);
+            
+            const isLast = currentLearnPage === currentLearnModule.pages.length - 1;
+            document.getElementById('learn-next').textContent = isLast ? 'Finish' : 'Next →';
+        }
+
+        function prevLearnPage() {
+            if (currentLearnPage > 0) {
+                currentLearnPage--;
+                renderLearnPage();
+            }
+        }
+
+        function nextLearnPage() {
+            if (currentLearnPage < currentLearnModule.pages.length - 1) {
+                currentLearnPage++;
+                renderLearnPage();
+            } else {
+                closeLearnModal();
+            }
+        }
+
+        function closeLearnModal() {
+            document.getElementById('learn-modal').classList.add('hidden');
+            currentLearnModule = null;
+        }
+
+        // ============================================
+        // KEYBOARD SHORTCUTS
+        // ============================================
+        function handleGlobalKeys(e) {
+            if (!document.getElementById('opt-keys').checked) return;
+            
+            // Ignore if typing in an input
+            if (e.target.tagName === 'INPUT') {
+                if (e.key === 'Escape') {
+                    if (challengeActive) {
+                        endChallenge();
+                    } else {
+                        skipQuestion();
+                    }
+                }
+                return;
+            }
+            
             if (e.key === 'Escape') {
-                feedbackText.innerText = "SKIPPED";
-                feedbackText.className = "text-gray-500 font-bold tracking-widest uppercase text-sm";
-                feedbackDiv.style.opacity = '1';
-                setTimeout(nextQuestion, 800);
+                // Close any open modal
+                document.getElementById('settings-modal').classList.add('hidden');
+                document.getElementById('stats-modal').classList.add('hidden');
+                document.getElementById('reference-modal').classList.add('hidden');
+                document.getElementById('learn-modal').classList.add('hidden');
             }
+            
+            if (e.key.toLowerCase() === 'h') {
+                showHint();
+            }
+            
+            if (e.key.toLowerCase() === 'b') {
+                toggleBookmark();
+            }
+            
+            // Focus input on any letter/number
+            if (/^[a-z0-9]$/i.test(e.key) && currentMode === 'drill') {
+                document.getElementById('input-field').focus();
+            }
+        }
+
+        // ============================================
+        // NEXT BUTTON
+        // ============================================
+        document.getElementById('next-btn').addEventListener('click', () => {
+            generateQuestion();
         });
 
-        // Modal Key Handling
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && !document.getElementById('settings-modal').classList.contains('hidden')) {
-                toggleSettings();
-            }
-        });
-
-        document.addEventListener('click', (e) => {
-            // Only focus input if modal is closed and click isn't on button
-            if (document.getElementById('settings-modal').classList.contains('hidden') && 
-                !e.target.closest('button')) {
-                inputField.focus();
-            }
-        });
-
+        // ============================================
+        // INITIALIZE
+        // ============================================
+        init();
     </script>
 </body>
-
 </html>
